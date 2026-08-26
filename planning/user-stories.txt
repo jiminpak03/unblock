@@ -1,0 +1,31 @@
+While logged out:
+Users can sign up for an account and log in
+Users can view a list of boards they're a member of
+Users can view a board's columns, cards, and dependency graph 
+While logged in:
+Users can create a board (OWNER)
+Users can invite another user to a board with a role: VIEWER, EDITOR, or OWNER
+Editors and owners can create/rename columns on a board
+Editors and owners can create custom categories for a board (a name and a color), so cards can be grouped by whatever fits the project
+Editors and owners can create a card in a column
+Editors and owners can move a card between columns
+Editors and owners can edit a card's title, description, and category
+Editors and owners can mark a card complete or incomplete, independent of which column it's in
+Editors and owners can delete a card
+Editors and owners can mark that one card depends on another card, so the team knows what's blocking what
+cards are prevented from depending on itself
+Users can see a list of cards that are currently unblocked
+Users can view the dependency graph as the board's default view 
+cards are colored by category to be distinguishable
+Users can see another member's card and status changes reflected live on the board and the dependency graph
+Owners can remove a member from a board or change their role
+Owners can permanently delete a board, which deletes all its columns, cards, dependencies, and categories
+Stretch goals:
+Users can attach a reference image to a card
+Users can drag directly between two cards on the graph to create a dependency, instead of using a picker
+Users can see live cursor presence on the graph while other members are viewing it
+Animations (graph lays out)
+Owners can archive a finished board
+Users can filter the graph by category or search by title, so they can navigate a large board without visually scanning everything
+Users can collapse or hide fully-completed dependency chains on the graph, so finished work doesn't clutter the view of what's still active
+Users can see a card's completion status directly on its tile in the column view, without opening it
