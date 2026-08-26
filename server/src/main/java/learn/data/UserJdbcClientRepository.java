@@ -3,6 +3,8 @@ package learn.data;
 import learn.data.mappers.UserMapper;
 import learn.models.User;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -14,7 +16,7 @@ public class UserJdbcClientRepository implements UserRepository {
     }
 
     @Override
-    public User findByUsername(String username) {
+    public User findByUsername(String username) throws DataAccessException{
         final String sql = "select * from user where username = ?";
         return jdbcClient.sql(sql)
                 .param(username)
@@ -23,7 +25,25 @@ public class UserJdbcClientRepository implements UserRepository {
     }
 
     @Override
-    public User create(User user) {
-        return null;
+    public User create(User user) throws DataAccessException{
+        final String sql = """
+                insert into user (username, password_hash)
+                values (:username, :password_hash)
+                """;
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        int rowsAffected = jdbcClient.sql(sql)
+                .param("username", user.getUsername())
+                .param("password_hash", user.getPassword())
+                .update(keyHolder, "id");
+
+        if (rowsAffected == 0) {
+            return null;
+        }
+
+        user.setId(keyHolder.getKey().intValue());
+
+        return user;
     }
 }

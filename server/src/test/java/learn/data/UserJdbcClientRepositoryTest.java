@@ -22,7 +22,7 @@ class UserJdbcClientRepositoryTest {
     }
 
     @Test
-    void findByUsername() {
+    void findByUsername() throws DataAccessException {
         User existingUser = repository.findByUsername("mallardmike");
 
         assertEquals(existingUser, TestDataHelper.existingUser());
