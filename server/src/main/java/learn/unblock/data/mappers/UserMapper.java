@@ -1,6 +1,6 @@
-package learn.data.mappers;
+package learn.unblock.data.mappers;
 
-import learn.models.User;
+import learn.unblock.models.User;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.sql.ResultSet;

@@ -1,6 +1,6 @@
-package learn.data;
+package learn.unblock.data;
 
-import learn.models.User;
+import learn.unblock.models.User;
 
 public interface UserRepository {
     User findByUsername(String username) throws DataAccessException;

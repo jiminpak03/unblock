@@ -1,16 +1,19 @@
-package learn.domain;
+package learn.unblock.domain;
 
-import learn.data.DataAccessException;
-import learn.data.UserRepository;
-import learn.models.User;
+import learn.unblock.data.DataAccessException;
+import learn.unblock.data.UserRepository;
+import learn.unblock.models.User;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UserService {
     private final UserRepository repository;
+    private final BCryptPasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository repository) {
+    public UserService(UserRepository repository, BCryptPasswordEncoder passwordEncoder) {
         this.repository = repository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public Result<User> create(User user) throws DataAccessException {

@@ -1,7 +1,7 @@
-package learn.data;
+package learn.unblock.data;
 
-import learn.data.mappers.UserMapper;
-import learn.models.User;
+import learn.unblock.data.mappers.UserMapper;
+import learn.unblock.models.User;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;

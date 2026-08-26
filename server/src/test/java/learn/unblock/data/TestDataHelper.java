@@ -1,6 +1,6 @@
-package learn.data;
+package learn.unblock.data;
 
-import learn.models.User;
+import learn.unblock.models.User;
 
 import java.time.LocalDateTime;
 

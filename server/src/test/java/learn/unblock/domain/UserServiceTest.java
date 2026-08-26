@@ -1,9 +1,9 @@
-package learn.domain;
+package learn.unblock.domain;
 
-import learn.data.DataAccessException;
-import learn.data.TestDataHelper;
-import learn.data.UserRepository;
-import learn.models.User;
+import learn.unblock.data.DataAccessException;
+import learn.unblock.data.TestDataHelper;
+import learn.unblock.data.UserRepository;
+import learn.unblock.models.User;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

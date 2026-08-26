@@ -1,4 +1,4 @@
-package learn.domain;
+package learn.unblock.domain;
 
 public enum ResultType {
     SUCCESS,

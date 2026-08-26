@@ -1,4 +1,4 @@
-package learn.domain;
+package learn.unblock.domain;
 
 import java.util.ArrayList;
 import java.util.List;

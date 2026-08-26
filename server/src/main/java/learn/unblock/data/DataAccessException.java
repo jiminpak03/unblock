@@ -1,4 +1,4 @@
-package learn.data;
+package learn.unblock.data;
 
 public class DataAccessException extends Exception {
     public DataAccessException(String message) {
