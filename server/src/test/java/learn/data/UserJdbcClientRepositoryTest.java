@@ -25,7 +25,7 @@ class UserJdbcClientRepositoryTest {
     void findByUsername() {
         User existingUser = repository.findByUsername("mallardmike");
 
-        assertEquals();
+        assertEquals(existingUser, TestDataHelper.existingUser());
     }
 
     @Test

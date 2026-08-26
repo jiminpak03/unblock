@@ -3,9 +3,15 @@ package learn.data;
 import learn.data.mappers.UserMapper;
 import learn.models.User;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
 
+@Repository
 public class UserJdbcClientRepository implements UserRepository {
-    private JdbcClient jdbcClient;
+    private final JdbcClient jdbcClient;
+
+    public UserJdbcClientRepository(JdbcClient jdbcClient) {
+        this.jdbcClient = jdbcClient;
+    }
 
     @Override
     public User findByUsername(String username) {
