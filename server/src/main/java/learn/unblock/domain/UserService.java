@@ -3,6 +3,7 @@ package learn.unblock.domain;
 import learn.unblock.data.DataAccessException;
 import learn.unblock.data.UserRepository;
 import learn.unblock.models.User;
+import learn.unblock.models.dtos.UserWithoutPassword;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,25 @@ public class UserService {
     public UserService(UserRepository repository, BCryptPasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    public Result<UserWithoutPassword> register(String username, String password) throws DataAccessException {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(password));
+
+        Result<User> createResult = create(user);
+
+        Result<UserWithoutPassword> result = new Result<>();
+        if (!createResult.isSuccess()) {
+            for (String message : createResult.getErrorMessages()) {
+                result.addErrorMessage(message, createResult.getResultType());
+            }
+            return result;
+        }
+
+        result.setpayload(UserWithoutPassword.fromUser(createResult.getpayload()));
+        return result;
     }
 
     public Result<User> create(User user) throws DataAccessException {
