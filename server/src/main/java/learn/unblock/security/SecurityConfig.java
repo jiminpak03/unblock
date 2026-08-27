@@ -1,4 +1,4 @@
-package learn.unblock.config;
+package learn.unblock.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
