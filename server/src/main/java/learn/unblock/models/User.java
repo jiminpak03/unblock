@@ -1,4 +1,4 @@
-package learn.models;
+package learn.unblock.models;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
