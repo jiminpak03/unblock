@@ -81,10 +81,10 @@ begin
 	alter table board auto_increment = 1;
 	alter table user auto_increment = 1;
 	
-	insert into user (username, password_hash) values
-	    ('mallardmike', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm'),
-	    ('quackuistador', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm'),
-	    ('waddlewarden', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm');
+	insert into user (username, password_hash, created_date) values
+    ('mallardmike', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm', '2026-01-01 10:00:00'),
+    ('quackuistador', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm', '2026-01-01 11:00:00'),
+    ('waddlewarden', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm', '2026-01-01 12:00:00');
 
 	insert into board (name, owner_id) values
 	    ('Roguelike prototype', 1);
