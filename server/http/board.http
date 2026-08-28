@@ -1,0 +1,14 @@
+### Create a board
+POST http://localhost:8080/api/board
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0IiwidXNlcm5hbWUiOiJuZXdkdWNrIiwiaWF0IjoxNzg3OTM0NTE0LCJleHAiOjE3ODgwMjA5MTR9.VvddWmWIfs1R-eUGCVuuz5dvysaOtPRcB1_sYxSOWnk
+Content-Type: application/json
+
+{ "name": "Roguelike prototype" }
+
+### List boards for this user
+GET http://localhost:8080/api/board
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0IiwidXNlcm5hbWUiOiJuZXdkdWNrIiwiaWF0IjoxNzg3OTM0NTE0LCJleHAiOjE3ODgwMjA5MTR9.VvddWmWIfs1R-eUGCVuuz5dvysaOtPRcB1_sYxSOWnk
+
+### Get columns for a board (use the board id from your earlier create response)
+GET http://localhost:8080/api/board/1/column
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0IiwidXNlcm5hbWUiOiJuZXdkdWNrIiwiaWF0IjoxNzg3OTM0NTE0LCJleHAiOjE3ODgwMjA5MTR9.VvddWmWIfs1R-eUGCVuuz5dvysaOtPRcB1_sYxSOWnk
