@@ -1,0 +1,49 @@
+### === CARD CATEGORY ===
+
+### Create a category on board 1
+POST http://localhost:8080/api/board/1/category
+Authorization: Bearer PASTE_TOKEN
+Content-Type: application/json
+
+{ "name": "Programming", "color": "violet" }
+
+### List categories for board 1
+GET http://localhost:8080/api/board/1/category
+Authorization: Bearer PASTE_TOKEN
+
+
+### === CARD ===
+
+### List columns for board 1 first, to get a real column id
+GET http://localhost:8080/api/board/1/column
+Authorization: Bearer PASTE_TOKEN
+
+### Create a card in a column (use a real columnId from the response above)
+POST http://localhost:8080/api/card
+Authorization: Bearer PASTE_TOKEN
+Content-Type: application/json
+
+{
+  "columnId": 1,
+  "categoryId": 1,
+  "title": "Combat system",
+  "description": "Melee attack, hitboxes, damage."
+}
+
+### List cards in that column (use the same columnId)
+GET http://localhost:8080/api/card/column/1
+Authorization: Bearer PASTE_TOKEN
+
+### Update a card (use the real id from the create response)
+PUT http://localhost:8080/api/card/1
+Authorization: Bearer PASTE_TOKEN
+Content-Type: application/json
+
+{
+  "columnId": 1,
+  "categoryId": 1,
+  "title": "Combat system (updated)",
+  "description": "Melee attack, hitboxes, damage, blocking.",
+  "isComplete": false,
+  "position": 0
+}
