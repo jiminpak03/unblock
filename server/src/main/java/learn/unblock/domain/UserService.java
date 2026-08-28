@@ -36,6 +36,24 @@ public class UserService {
         return result;
     }
 
+    public Result<UserWithoutPassword> login(String username, String password) throws DataAccessException {
+        Result<UserWithoutPassword> result = new Result<>();
+
+        if (username == null || username.isBlank()) {
+            result.addErrorMessage("Username cannot be blank", ResultType.INVALID);
+            return result;
+        }
+
+        User user = repository.findByUsername(username);
+        if (user == null || !passwordEncoder.matches(password, user.getPassword())) {
+            result.addErrorMessage("Username or password is wrong", ResultType.INVALID);
+            return result;
+        }
+
+        result.setpayload(UserWithoutPassword.fromUser(user));
+        return result;
+    }
+
     public Result<User> create(User user) throws DataAccessException {
         Result<User> result = new Result<>();
 
