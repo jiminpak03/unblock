@@ -1,7 +1,11 @@
 package learn.unblock.models;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDateTime;
 import java.util.Objects;
+
+
 
 public class Card {
     private int id;
@@ -29,6 +33,11 @@ public class Card {
         this.imageUrl = imageUrl;
         this.createdDate = createdDate;
         this.editDate = editDate;
+    }
+
+    @JsonProperty("isComplete")
+    public boolean isComplete() {
+        return isComplete;
     }
 
     public int getId() {
@@ -69,10 +78,6 @@ public class Card {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public boolean isComplete() {
-        return isComplete;
     }
 
     public void setComplete(boolean complete) {

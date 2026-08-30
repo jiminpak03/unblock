@@ -1,9 +1,10 @@
 use unblock;
 	
+-- password: password
 insert into user (username, password_hash) values
-	('mallardmike', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm'),
-	('quackuistador', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm'),
-	('waddlewarden', '$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm');
+	('mallardmike', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
+	('quackuistador', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
+	('waddlewarden', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K');
 
 insert into board (name, owner_id) values
 	('Roguelike prototype', 1);

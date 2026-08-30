@@ -3,6 +3,7 @@ package learn.unblock.controllers;
 import learn.unblock.data.CardDependencyRepository;
 import learn.unblock.domain.CardDependencyService;
 import learn.unblock.domain.Result;
+import learn.unblock.models.dtos.AddDependencyRequest;
 import learn.unblock.models.dtos.UserWithoutPassword;
 import learn.unblock.security.JwtConverter;
 import org.springframework.http.HttpStatus;

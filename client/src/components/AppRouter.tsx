@@ -4,6 +4,8 @@ import type { UserWithoutPassword } from "../types/User";
 import Layout from "./Layout";
 import Login from "./Login";
 import Register from "./Register";
+import BoardList from "./BoardList";
+import BoardView from "./BoardView";
 
 function AppRouter() {
   const [user, setUser] = useState<UserWithoutPassword | null>(null);
@@ -39,6 +41,8 @@ function AppRouter() {
       children: [
         { path: "/login", element: <Login onLogin={handleLogin} /> },
         { path: "/register", element: <Register /> },
+        { path: "/", element: token ? <BoardList token={token} /> : <Login onLogin={handleLogin} /> },
+        { path: "/board/:boardId", element: token ? <BoardView token={token} /> : <Login onLogin={handleLogin} /> },
       ],
     },
   ]);
