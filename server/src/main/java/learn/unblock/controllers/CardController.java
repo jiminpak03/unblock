@@ -36,7 +36,7 @@ public class CardController {
 
         Result<Card> result = service.create(request.getColumnId(), request.getCategoryId(), request.getTitle(), request.getDescription());
         if (!result.isSuccess()) return new ResponseEntity<>(result.getErrorMessages(), HttpStatus.BAD_REQUEST);
-        return new ResponseEntity<>(result.getpayload(), HttpStatus.CREATED);
+        return new RespgitonseEntity<>(result.getpayload(), HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")

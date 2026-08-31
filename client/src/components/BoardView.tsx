@@ -29,6 +29,9 @@ function BoardView({ token }: BoardViewProps) {
   const [unblockedIds, setUnblockedIds] = useState<number[]>([]);
   const [newCardTitle, setNewCardTitle] = useState("");
   const [targetColumnId, setTargetColumnId] = useState<number | null>(null);
+  const [moveTarget, setMoveTarget] = useState<{ [cardId: number]: string }>(
+    {},
+  );
   const [dependencyTarget, setDependencyTarget] = useState<{
     [cardId: number]: string;
   }>({});
@@ -64,7 +67,7 @@ function BoardView({ token }: BoardViewProps) {
       .then((ids: number[]) => setUnblockedIds(Array.isArray(ids) ? ids : []));
   }, [boardId, token]);
 
-  async function handleAddCard(event: React.FormEvent) {
+  async function handleAddCard(event: React.SubmitEvent) {
     event.preventDefault();
     if (targetColumnId === null) return;
 
@@ -106,6 +109,24 @@ function BoardView({ token }: BoardViewProps) {
     } else {
       const errors = await response.json();
       alert(errors[0] ?? "Could not add dependency.");
+    }
+  }
+
+  async function handleMoveCard(card: Card, newColumnId: number) {
+    const updated = { ...card, columnId: newColumnId };
+
+    const response = await fetch(`http://localhost:8080/api/card/${card.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(updated),
+    });
+
+    if (response.ok) {
+      setCards(cards.map((c) => (c.id === card.id ? updated : c)));
+      refreshUnblocked();
     }
   }
 
@@ -187,10 +208,7 @@ function BoardView({ token }: BoardViewProps) {
       {/* Columns */}
       <div className="flex gap-4 overflow-x-auto">
         {columns.map((col) => (
-          <div
-            key={col.id}
-            className="bg-gray-50 rounded-lg p-3 w-64 flex-shrink-0"
-          >
+          <div key={col.id} className="bg-gray-50 rounded-lg p-3 w-64 shrink-0">
             <h3 className="font-semibold mb-2">{col.name}</h3>
             <div className="space-y-2">
               {cards
@@ -245,6 +263,26 @@ function BoardView({ token }: BoardViewProps) {
                         >
                           +
                         </button>
+                      </div>
+                      <div className="mt-1">
+                        <select
+                          value={moveTarget[card.id] ?? String(card.columnId)}
+                          onChange={(e) => {
+                            const newColumnId = Number(e.target.value);
+                            setMoveTarget({
+                              ...moveTarget,
+                              [card.id]: e.target.value,
+                            });
+                            handleMoveCard(card, newColumnId);
+                          }}
+                          className="text-xs border rounded w-full"
+                        >
+                          {columns.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       {!unblockedIds.includes(card.id) && !card.isComplete && (
                         <span className="text-xs text-rose-600">blocked</span>
