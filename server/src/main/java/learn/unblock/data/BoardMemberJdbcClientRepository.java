@@ -2,6 +2,8 @@ package learn.unblock.data;
 
 import learn.unblock.data.mappers.BoardMemberMapper;
 import learn.unblock.models.BoardMember;
+import learn.unblock.models.MemberRole;
+import learn.unblock.models.dtos.BoardMemberWithUsername;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -47,11 +49,21 @@ public class BoardMemberJdbcClientRepository implements BoardMemberRepository{
     }
 
     @Override
-    public List<BoardMember> findByBoardId(int boardId) {
-        final String sql = "select * from board_member where board_id = ?";
+    public List<BoardMemberWithUsername> findByBoardId(int boardId) {
+        final String sql = """
+            select bm.user_id, u.username, bm.role
+            from board_member bm
+            join user u on bm.user_id = u.id
+            where bm.board_id = ?
+            """;
+
         return jdbcClient.sql(sql)
                 .param(boardId)
-                .query(new BoardMemberMapper())
+                .query((rs, rowNum) -> new BoardMemberWithUsername(
+                        rs.getInt("user_id"),
+                        rs.getString("username"),
+                        MemberRole.valueOf(rs.getString("role"))
+                ))
                 .list();
     }
 }
