@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import type { UserWithoutPassword } from "../types/User";
 
 interface Column {
   id: number;
@@ -20,9 +21,16 @@ interface Card {
 
 interface BoardViewProps {
   token: string;
+  user: UserWithoutPassword;
 }
 
-function BoardView({ token }: BoardViewProps) {
+interface Member {
+  userId: number;
+  username: string;
+  role: string;
+}
+
+function BoardView({ token, user }: BoardViewProps) {
   const { boardId } = useParams();
   const [columns, setColumns] = useState<Column[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
@@ -35,6 +43,12 @@ function BoardView({ token }: BoardViewProps) {
   const [dependencyTarget, setDependencyTarget] = useState<{
     [cardId: number]: string;
   }>({});
+  const [usernameToInvite, setUsernameToInvite] = useState("");
+  const [targetRole, setTargetRole] = useState<string | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+
+  const myRole = members.find((m) => m.userId === user.id)?.role;
+  const isOwner = myRole === "OWNER";
 
   useEffect(() => {
     if (!boardId) return;
@@ -60,12 +74,53 @@ function BoardView({ token }: BoardViewProps) {
         setCards(allCards);
       });
 
+    fetch(`http://localhost:8080/api/board/${boardId}/member`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data: Member[]) => setMembers(Array.isArray(data) ? data : []));
+
     fetch(`http://localhost:8080/api/board/${boardId}/unblocked`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((ids: number[]) => setUnblockedIds(Array.isArray(ids) ? ids : []));
   }, [boardId, token]);
+
+  async function handleInviteMember(event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!usernameToInvite || !targetRole) return;
+
+    const response = await fetch(
+      `http://localhost:8080/api/board/${boardId}/member`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          username: usernameToInvite,
+          role: targetRole,
+        }),
+      },
+    );
+
+    if (response.ok) {
+      const updated = await fetch(
+        `http://localhost:8080/api/board/${boardId}/member`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      ).then((res) => res.json());
+      setMembers(updated);
+      setUsernameToInvite("");
+      setTargetRole(null);
+    } else {
+      const errors = await response.json();
+      alert(errors[0] ?? "Could not invite member.");
+    }
+  }
 
   async function handleAddCard(event: React.SubmitEvent) {
     event.preventDefault();
@@ -160,6 +215,46 @@ function BoardView({ token }: BoardViewProps) {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Board</h1>
+      <div className="mb-6">
+        <h2 className="font-semibold text-sm mb-2">Members</h2>
+        <ul className="text-sm space-y-1 mb-4">
+          {members.map((m) => (
+            <li key={m.userId} className="flex justify-between max-w-xs">
+              <span>{m.username}</span>
+              <span className="text-gray-500">{m.role}</span>
+            </li>
+          ))}
+        </ul>
+
+        {isOwner && (
+          <form onSubmit={handleInviteMember} className="flex gap-2">
+            <input
+              value={usernameToInvite}
+              onChange={(e) => setUsernameToInvite(e.target.value)}
+              placeholder="Username to invite"
+              className="border rounded-lg px-3 py-2 flex-1"
+            />
+            <select
+              value={targetRole ?? ""}
+              onChange={(e) => setTargetRole(e.target.value)}
+              className="border rounded-lg px-2"
+            >
+              <option value="" disabled>
+                Choose a role
+              </option>
+              <option value="VIEWER">Viewer</option>
+              <option value="EDITOR">Editor</option>
+              <option value="OWNER">Owner</option>
+            </select>
+            <button
+              type="submit"
+              className="bg-indigo-600 text-white rounded-lg px-4 py-2"
+            >
+              Invite
+            </button>
+          </form>
+        )}
+      </div>
 
       {/* Ready to work on — the differentiator, delivered as a list */}
       <div className="mb-6 border rounded-lg p-4 bg-indigo-50">

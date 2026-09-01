@@ -9,4 +9,5 @@ public interface CardRepository {
     Card findById(int id);
     List<Card> findByColumnId(int columnId);
     boolean update(Card card);
+    boolean delete(Card card);
 }

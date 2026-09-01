@@ -41,6 +41,11 @@ public class BoardMemberController {
         return new ResponseEntity<>(result.getpayload(), HttpStatus.CREATED);
     }
 
+    @GetMapping("/{boardId}/member")
+    public ResponseEntity<?> findMembers(@PathVariable int boardId) {
+        return new ResponseEntity<>(repository.findByBoardId(boardId), HttpStatus.OK);
+    }
+
     private UserWithoutPassword getAuthenticatedUser(String authHeader) {
         String token = authHeader.replace("Bearer ", "");
         return jwtConverter.getUserFromToken(token);

@@ -42,7 +42,7 @@ function AppRouter() {
         { path: "/login", element: <Login onLogin={handleLogin} /> },
         { path: "/register", element: <Register /> },
         { path: "/", element: token ? <BoardList token={token} /> : <Login onLogin={handleLogin} /> },
-        { path: "/board/:boardId", element: token ? <BoardView token={token} /> : <Login onLogin={handleLogin} /> },
+        { path: "/board/:boardId", element: token && user ? <BoardView token={token} user={user} /> : <Login onLogin={handleLogin} /> },
       ],
     },
   ]);
