@@ -55,6 +55,16 @@ public class BoardController {
         return new ResponseEntity<>(boards, HttpStatus.OK);
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable int id, @RequestHeader("Authorization") String authHeader) throws DataAccessException {
+        UserWithoutPassword user = getAuthenticatedUser(authHeader);
+        if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        Result<Void> result = service.delete(id, user.getId());
+        if (!result.isSuccess()) return new ResponseEntity<>(result.getErrorMessages(), HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
     private UserWithoutPassword getAuthenticatedUser(String authHeader) {
         String token = authHeader.replace("Bearer ", "");
         return jwtConverter.getUserFromToken(token);
