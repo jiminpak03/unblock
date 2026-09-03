@@ -73,4 +73,13 @@ public class CardJdbcClientRepository implements CardRepository {
                 .param("id", card.getId())
                 .update() > 0;
     }
+
+    @Override
+    public boolean delete(int id) {
+        final String sql = "delete from card where id = ?";
+
+        return jdbcClient.sql(sql)
+                .param(id)
+                .update() > 0;
+    }
 }
