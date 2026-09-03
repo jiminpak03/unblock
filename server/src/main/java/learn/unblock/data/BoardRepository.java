@@ -10,4 +10,6 @@ public interface BoardRepository {
     Board create(Board board) throws DataAccessException;
 
     List<Board> findByUserId(int userId) throws DataAccessException;
+
+    boolean delete(int id);
 }

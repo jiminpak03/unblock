@@ -64,4 +64,10 @@ public class BoardJdbcClientRepository implements BoardRepository {
                 .query(new BoardMapper())
                 .list();
     }
+
+    @Override
+    public boolean delete(int id) {
+        final String sql = "delete from board where id = ?";
+        return jdbcClient.sql(sql).param(id).update() > 0;
+    }
 }

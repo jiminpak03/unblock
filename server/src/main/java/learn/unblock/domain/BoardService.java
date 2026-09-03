@@ -57,7 +57,20 @@ public class BoardService {
         return result;
     }
 
-    public boolean canDelete(Board board, int userId) {
-        return board.getOwnerId() == userId;
+    public Result<Void> delete(int boardId, int userId) throws DataAccessException {
+        Result<Void> result = new Result<>();
+        Board board = boardRepository.findById(boardId);
+
+        if (board == null) {
+            result.addErrorMessage("Board not found.", ResultType.NOT_FOUND);
+            return result;
+        }
+        if (board.getOwnerId() != userId) {
+            result.addErrorMessage("Only the board's creator can delete it.", ResultType.INVALID);
+            return result;
+        }
+
+        boardRepository.delete(boardId);
+        return result;
     }
 }
