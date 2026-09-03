@@ -38,4 +38,14 @@ public class CardDependencyController {
     public ResponseEntity<?> findDependencies(@PathVariable int cardId) {
         return new ResponseEntity<>(repository.findDependencies(cardId), HttpStatus.OK);
     }
+
+    @DeleteMapping("/{cardId}/dependency/{dependsOnCardId}")
+    public ResponseEntity<?> removeDependency(@PathVariable int cardId, @PathVariable int dependsOnCardId,
+                                              @RequestHeader("Authorization") String authHeader) {
+        UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
+        if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        repository.delete(cardId, dependsOnCardId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
 }

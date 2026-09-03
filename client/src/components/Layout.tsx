@@ -23,6 +23,9 @@ function Layout({ user, onLogout }: LayoutProps) {
 
         {user ? (
           <div className="flex items-center gap-4 text-sm">
+            <Link to="/" className="text-gray-600 hover:text-indigo-600">
+              My Boards
+            </Link>
             <span className="text-gray-600">{user.username}</span>
             <button onClick={handleLogoutClick} className="text-red-600">
               Log out
@@ -30,8 +33,12 @@ function Layout({ user, onLogout }: LayoutProps) {
           </div>
         ) : (
           <div className="flex items-center gap-4 text-sm">
-            <Link to="/login" className="text-indigo-600">Log in</Link>
-            <Link to="/register" className="text-indigo-600">Register</Link>
+            <Link to="/login" className="text-indigo-600">
+              Log in
+            </Link>
+            <Link to="/register" className="text-indigo-600">
+              Register
+            </Link>
           </div>
         )}
       </nav>

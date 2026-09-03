@@ -64,4 +64,17 @@ public class CardDependencyJdbcClientRepository implements CardDependencyReposit
                 .query(Integer.class)
                 .list();
     }
+
+    @Override
+    public boolean delete(int cardId, int dependsOnCardId) {
+        final String sql = """
+                delete from card_dependency where card_id = ?
+                and depends_on_card_id = ?
+                """;
+
+        return jdbcClient.sql(sql)
+                .param(cardId)
+                .param(dependsOnCardId)
+                .update() > 0;
+    }
 }

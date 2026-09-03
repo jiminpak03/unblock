@@ -12,3 +12,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0IiwidXNlcm5hbWUiOiJuZXdkd
 ### Get columns for a board (use the board id from your earlier create response)
 GET http://localhost:8080/api/board/1/column
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI0IiwidXNlcm5hbWUiOiJuZXdkdWNrIiwiaWF0IjoxNzg3OTM0NTE0LCJleHAiOjE3ODgwMjA5MTR9.VvddWmWIfs1R-eUGCVuuz5dvysaOtPRcB1_sYxSOWnk
+
+###
+GET http://localhost:8080/api/board/1/unblocked
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJtYWxsYXJkbWlrZSIsImlhdCI6MTc4ODExNzI5OCwiZXhwIjoxNzg4MjAzNjk4fQ.quUEprBVByptqzeU4Ze9ER3pglTATxg7OSV5-wIeVoE
