@@ -50,4 +50,20 @@ public class BoardColumnJdbcClientRepository implements BoardColumnRepository{
                 .query(new BoardColumnMapper())
                 .list();
     }
+
+    @Override
+    public boolean update(BoardColumn column) {
+        final String sql = "update board_column set name = ?, position = ? where id = ?";
+        return jdbcClient.sql(sql)
+                .param(column.getName())
+                .param(column.getPosition())
+                .param(column.getId())
+                .update() > 0;
+    }
+
+    @Override
+    public boolean delete(int id) {
+        final String sql = "delete from board_column where id = ?";
+        return jdbcClient.sql(sql).param(id).update() > 0;
+    }
 }

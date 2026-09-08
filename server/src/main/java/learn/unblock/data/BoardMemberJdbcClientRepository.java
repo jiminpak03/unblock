@@ -66,4 +66,20 @@ public class BoardMemberJdbcClientRepository implements BoardMemberRepository{
                 ))
                 .list();
     }
+
+    @Override
+    public boolean delete(int boardId, int userId) {
+        final String sql = "delete from board_member where board_id = ? and user_id = ?";
+        return jdbcClient.sql(sql).param(boardId).param(userId).update() > 0;
+    }
+
+    @Override
+    public boolean updateRole(int boardId, int userId, MemberRole role) {
+        final String sql = "update board_member set role = ? where board_id = ? and user_id = ?";
+        return jdbcClient.sql(sql)
+                .param(role.toString())
+                .param(boardId)
+                .param(userId)
+                .update() > 0;
+    }
 }

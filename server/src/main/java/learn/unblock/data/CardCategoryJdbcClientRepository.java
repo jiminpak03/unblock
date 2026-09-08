@@ -49,4 +49,20 @@ public class CardCategoryJdbcClientRepository implements CardCategoryRepository 
                 .query(new CardCategoryMapper())
                 .list();
     }
+
+    @Override
+    public boolean update(CardCategory category) {
+        final String sql = "update card_category set name = ?, color = ? where id = ?";
+        return jdbcClient.sql(sql)
+                .param(category.getName())
+                .param(category.getColor())
+                .param(category.getId())
+                .update() > 0;
+    }
+
+    @Override
+    public boolean delete(int id) {
+        final String sql = "delete from card_category where id = ?";
+        return jdbcClient.sql(sql).param(id).update() > 0;
+    }
 }
