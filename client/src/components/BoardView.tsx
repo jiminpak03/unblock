@@ -1,37 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import type { UserWithoutPassword } from "../types/User";
+import type { Column, Card, Category, Member } from "../types/board";
 import DependencyGraph from "./DependencyGraph";
-
-interface Column {
-  id: number;
-  boardId: number;
-  name: string;
-  position: number;
-}
-
-interface Card {
-  id: number;
-  columnId: number;
-  categoryId: number | null;
-  title: string;
-  description: string;
-  isComplete: boolean;
-  position: number;
-}
-
-interface Category {
-  id: number;
-  boardId: number;
-  name: string;
-  color: string;
-}
-
-interface Member {
-  userId: number;
-  username: string;
-  role: string;
-}
+import BoardColumnCard from "./BoardColumnCard";
+import BoardMembers from "./BoardMembers";
+import BoardCategories from "./BoardCategories";
+import CardDetailModal from "./CardDetailModal";
 
 interface BoardViewProps {
   token: string;
@@ -46,26 +21,12 @@ function BoardView({ token, user }: BoardViewProps) {
   const [unblockedIds, setUnblockedIds] = useState<number[]>([]);
   const [newCardTitle, setNewCardTitle] = useState("");
   const [targetColumnId, setTargetColumnId] = useState<number | null>(null);
-  const [moveTarget, setMoveTarget] = useState<{ [cardId: number]: string }>(
-    {},
-  );
-  const [dependencyTarget, setDependencyTarget] = useState<{
-    [cardId: number]: string;
-  }>({});
-  const [usernameToInvite, setUsernameToInvite] = useState("");
-  const [targetRole, setTargetRole] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [view, setView] = useState<"list" | "graph">("list");
   const [graphVersion, setGraphVersion] = useState(0);
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newCategoryColor, setNewCategoryColor] = useState("#8b5cf6");
   const [newColumnName, setNewColumnName] = useState("");
 
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [cardDependencyIds, setCardDependencyIds] = useState<number[]>([]);
-  const [columnEdits, setColumnEdits] = useState<{ [id: number]: string }>({});
 
   const myRole = members.find((m) => m.userId === user.id)?.role;
   const isOwner = myRole === "OWNER";
@@ -117,21 +78,6 @@ function BoardView({ token, user }: BoardViewProps) {
       .then((ids: number[]) => setUnblockedIds(Array.isArray(ids) ? ids : []));
   }, [boardId, token]);
 
-  useEffect(() => {
-    if (!selectedCard) return;
-    setEditTitle(selectedCard.title);
-    setEditDescription(selectedCard.description ?? "");
-
-    fetch(`http://localhost:8080/api/card/${selectedCard.id}/dependency`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((ids: number[]) =>
-        setCardDependencyIds(Array.isArray(ids) ? ids : []),
-      )
-      .catch(() => setCardDependencyIds([]));
-  }, [selectedCardId]);
-
   function refreshUnblocked() {
     fetch(`http://localhost:8080/api/board/${boardId}/unblocked`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -168,10 +114,10 @@ function BoardView({ token, user }: BoardViewProps) {
     }
   }
 
-  async function handleInviteMember(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!usernameToInvite || !targetRole) return;
-
+  async function handleInviteMember(
+    username: string,
+    role: string,
+  ): Promise<boolean> {
     const response = await fetch(
       `http://localhost:8080/api/board/${boardId}/member`,
       {
@@ -180,7 +126,7 @@ function BoardView({ token, user }: BoardViewProps) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ username: usernameToInvite, role: targetRole }),
+        body: JSON.stringify({ username, role }),
       },
     );
 
@@ -192,11 +138,11 @@ function BoardView({ token, user }: BoardViewProps) {
         },
       ).then((res) => res.json());
       setMembers(updated);
-      setUsernameToInvite("");
-      setTargetRole(null);
+      return true;
     } else {
       const errors = await response.json();
       alert(errors[0] ?? "Could not invite member.");
+      return false;
     }
   }
 
@@ -235,9 +181,11 @@ function BoardView({ token, user }: BoardViewProps) {
     }
   }
 
-  async function handleAddDependency(cardId: number) {
-    const dependsOnCardId = Number(dependencyTarget[cardId]);
-    if (!dependsOnCardId) return;
+  async function handleAddDependency(
+    cardId: number,
+    dependsOnCardId: number,
+  ): Promise<boolean> {
+    if (!dependsOnCardId) return false;
 
     const response = await fetch(
       `http://localhost:8080/api/card/${cardId}/dependency`,
@@ -253,20 +201,18 @@ function BoardView({ token, user }: BoardViewProps) {
 
     if (response.ok) {
       notifyChanged();
-      setDependencyTarget({ ...dependencyTarget, [cardId]: "" });
-      if (selectedCardId === cardId) {
-        setCardDependencyIds([...cardDependencyIds, dependsOnCardId]);
-      }
+      return true;
     } else {
       const errors = await response.json();
       alert(errors[0] ?? "Could not add dependency.");
+      return false;
     }
   }
 
   async function handleRemoveDependency(
     cardId: number,
     dependsOnCardId: number,
-  ) {
+  ): Promise<boolean> {
     const response = await fetch(
       `http://localhost:8080/api/card/${cardId}/dependency/${dependsOnCardId}`,
       {
@@ -276,11 +222,10 @@ function BoardView({ token, user }: BoardViewProps) {
     );
 
     if (response.ok) {
-      setCardDependencyIds(
-        cardDependencyIds.filter((id) => id !== dependsOnCardId),
-      );
       notifyChanged();
+      return true;
     }
+    return false;
   }
 
   async function handleMoveCard(card: Card, newColumnId: number) {
@@ -332,28 +277,24 @@ function BoardView({ token, user }: BoardViewProps) {
     }
   }
 
-  async function handleSaveCardDetails() {
-    if (!selectedCard) return;
-    const updated = {
-      ...selectedCard,
-      title: editTitle,
-      description: editDescription,
-    };
+  async function handleSaveCardDetails(
+    card: Card,
+    title: string,
+    description: string,
+  ) {
+    const updated = { ...card, title, description };
 
-    const response = await fetch(
-      `http://localhost:8080/api/card/${selectedCard.id}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(updated),
+    const response = await fetch(`http://localhost:8080/api/card/${card.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
-    );
+      body: JSON.stringify(updated),
+    });
 
     if (response.ok) {
-      setCards(cards.map((c) => (c.id === selectedCard.id ? updated : c)));
+      setCards(cards.map((c) => (c.id === card.id ? updated : c)));
       setSelectedCardId(null);
       setGraphVersion((v) => v + 1);
     }
@@ -394,9 +335,11 @@ function BoardView({ token, user }: BoardViewProps) {
     }
   }
 
-  async function handleAddCategory(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!newCategoryName || !boardId) return;
+  async function handleAddCategory(
+    name: string,
+    color: string,
+  ): Promise<boolean> {
+    if (!name || !boardId) return false;
 
     const response = await fetch(
       `http://localhost:8080/api/board/${boardId}/category`,
@@ -406,18 +349,16 @@ function BoardView({ token, user }: BoardViewProps) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          name: newCategoryName,
-          color: newCategoryColor,
-        }),
+        body: JSON.stringify({ name, color }),
       },
     );
 
     if (response.ok) {
       const created: Category = await response.json();
       setCategories([...categories, created]);
-      setNewCategoryName("");
+      return true;
     }
+    return false;
   }
 
   async function handleDeleteCategory(id: number) {
@@ -458,102 +399,19 @@ function BoardView({ token, user }: BoardViewProps) {
     <div>
       <h1 className="text-2xl font-bold mb-4">Board</h1>
 
-      {/* Members */}
-      <div className="mb-6">
-        <h2 className="font-semibold text-sm mb-2">Members</h2>
-        <ul className="text-sm space-y-1 mb-4">
-          {members.map((m) => (
-            <li
-              key={m.userId}
-              className="flex justify-between max-w-xs items-center"
-            >
-              <span>{m.username}</span>
-              <span className="flex items-center gap-2">
-                <span className="text-gray-500">{m.role}</span>
-                {isOwner && m.userId !== user.id && (
-                  <button
-                    onClick={() => handleRemoveMember(m.userId)}
-                    className="text-xs text-red-500"
-                  >
-                    Remove
-                  </button>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
+      <BoardMembers
+        members={members}
+        currentUserId={user.id}
+        isOwner={isOwner}
+        onRemoveMember={handleRemoveMember}
+        onInviteMember={handleInviteMember}
+      />
 
-        {isOwner && (
-          <form onSubmit={handleInviteMember} className="flex gap-2">
-            <input
-              value={usernameToInvite}
-              onChange={(e) => setUsernameToInvite(e.target.value)}
-              placeholder="Username to invite"
-              className="border rounded-lg px-3 py-2 flex-1"
-            />
-            <select
-              value={targetRole ?? ""}
-              onChange={(e) => setTargetRole(e.target.value)}
-              className="border rounded-lg px-2"
-            >
-              <option value="" disabled>
-                Choose a role
-              </option>
-              <option value="VIEWER">Viewer</option>
-              <option value="EDITOR">Editor</option>
-              <option value="OWNER">Owner</option>
-            </select>
-            <button
-              type="submit"
-              className="bg-indigo-600 text-white rounded-lg px-4 py-2"
-            >
-              Invite
-            </button>
-          </form>
-        )}
-      </div>
-
-      {/* Categories */}
-      <div className="mb-6">
-        <h2 className="font-semibold text-sm mb-2">Categories</h2>
-        <div className="flex gap-2 mb-2 flex-wrap">
-          {categories.map((cat) => (
-            <span
-              key={cat.id}
-              className="text-xs bg-gray-100 rounded-full px-2 py-1 flex items-center gap-1"
-            >
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: cat.color }}
-              />
-              {cat.name}
-              <button
-                onClick={() => handleDeleteCategory(cat.id)}
-                className="text-red-500"
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-        </div>
-        <form onSubmit={handleAddCategory} className="flex gap-2">
-          <input
-            value={newCategoryName}
-            onChange={(e) => setNewCategoryName(e.target.value)}
-            placeholder="Category name"
-            className="border rounded-lg px-2 py-1 text-sm flex-1"
-          />
-          <input
-            type="color"
-            value={newCategoryColor}
-            onChange={(e) => setNewCategoryColor(e.target.value)}
-            className="w-10 h-8 border rounded"
-          />
-          <button type="submit" className="text-sm bg-gray-200 rounded-lg px-3">
-            Add
-          </button>
-        </form>
-      </div>
+      <BoardCategories
+        categories={categories}
+        onAddCategory={handleAddCategory}
+        onDeleteCategory={handleDeleteCategory}
+      />
 
       {/* View toggle */}
       <div className="flex bg-gray-100 rounded-lg p-0.5 text-sm mb-4 w-fit">
@@ -627,145 +485,21 @@ function BoardView({ token, user }: BoardViewProps) {
 
           <div className="flex gap-4 overflow-x-auto">
             {columns.map((col) => (
-              <div
+              <BoardColumnCard
                 key={col.id}
-                className="bg-gray-50 rounded-lg p-3 w-64 shrink-0"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <input
-                    value={columnEdits[col.id] ?? col.name}
-                    onChange={(e) =>
-                      setColumnEdits({
-                        ...columnEdits,
-                        [col.id]: e.target.value,
-                      })
-                    }
-                    onBlur={() => {
-                      if (
-                        columnEdits[col.id] &&
-                        columnEdits[col.id] !== col.name
-                      ) {
-                        handleRenameColumn(col, columnEdits[col.id]);
-                      }
-                    }}
-                  />
-                  <button
-                    onClick={() => handleDeleteColumn(col.id)}
-                    className="text-xs text-red-500 ml-1"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {cards
-                    .filter((c) => c.columnId === col.id)
-                    .map((card) => {
-                      const isBlocked =
-                        !unblockedIds.includes(card.id) && !card.isComplete;
-                      const category = categories.find(
-                        (cat) => cat.id === card.categoryId,
-                      );
-
-                      return (
-                        <div
-                          key={card.id}
-                          id={`card-${card.id}`}
-                          className="bg-white border rounded-lg p-3 space-y-2"
-                        >
-                          <div className="flex items-center justify-between">
-                            <label className="flex items-center gap-2 text-sm flex-1">
-                              <input
-                                type="checkbox"
-                                checked={card.isComplete}
-                                disabled={isBlocked}
-                                onChange={() => toggleComplete(card)}
-                              />
-                              {category && (
-                                <span
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{ backgroundColor: category.color }}
-                                />
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setSelectedCardId(card.id)}
-                                className={`text-left hover:underline ${
-                                  card.isComplete
-                                    ? "line-through text-gray-400"
-                                    : isBlocked
-                                      ? "text-gray-400"
-                                      : ""
-                                }`}
-                              >
-                                {card.title}
-                              </button>
-                            </label>
-                            <button
-                              onClick={() => handleDeleteCard(card.id)}
-                              className="text-xs text-red-500"
-                            >
-                              ✕
-                            </button>
-                          </div>
-
-                          {isBlocked && (
-                            <span className="text-xs text-rose-600">
-                              blocked
-                            </span>
-                          )}
-
-                          <div className="flex gap-1">
-                            <select
-                              value={dependencyTarget[card.id] ?? ""}
-                              onChange={(e) =>
-                                setDependencyTarget({
-                                  ...dependencyTarget,
-                                  [card.id]: e.target.value,
-                                })
-                              }
-                              className="text-xs border rounded flex-1"
-                            >
-                              <option value="">Depends on...</option>
-                              {cards
-                                .filter((c) => c.id !== card.id)
-                                .map((c) => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.title}
-                                  </option>
-                                ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => handleAddDependency(card.id)}
-                              className="text-xs bg-gray-200 rounded px-2"
-                            >
-                              +
-                            </button>
-                          </div>
-
-                          <select
-                            value={moveTarget[card.id] ?? String(card.columnId)}
-                            onChange={(e) => {
-                              const newColumnId = Number(e.target.value);
-                              setMoveTarget({
-                                ...moveTarget,
-                                [card.id]: e.target.value,
-                              });
-                              handleMoveCard(card, newColumnId);
-                            }}
-                            className="text-xs border rounded w-full"
-                          >
-                            {columns.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
+                column={col}
+                columns={columns}
+                cards={cards}
+                categories={categories}
+                unblockedIds={unblockedIds}
+                onRenameColumn={handleRenameColumn}
+                onDeleteColumn={handleDeleteColumn}
+                onToggleComplete={toggleComplete}
+                onSelectCard={(cardId) => setSelectedCardId(cardId)}
+                onDeleteCard={handleDeleteCard}
+                onAddDependency={handleAddDependency}
+                onMoveCard={handleMoveCard}
+              />
             ))}
           </div>
         </>
@@ -773,134 +507,18 @@ function BoardView({ token, user }: BoardViewProps) {
 
       {/* Expanded card view */}
       {selectedCard && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => setSelectedCardId(null)}
-        >
-          <div
-            className="bg-white rounded-xl shadow-lg w-full max-w-lg p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <input
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="text-lg font-bold w-full outline-none border-b border-transparent focus:border-gray-200"
-              />
-              <button
-                onClick={() => setSelectedCardId(null)}
-                className="text-gray-400 ml-2"
-              >
-                ✕
-              </button>
-            </div>
-
-            <label className="flex items-center gap-2 mb-4 text-sm">
-              <input
-                type="checkbox"
-                checked={selectedCard.isComplete}
-                onChange={() => toggleComplete(selectedCard)}
-              />
-              Mark complete
-            </label>
-
-            <div className="mb-4">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Description
-              </label>
-              <textarea
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                rows={3}
-                className="w-full border border-gray-200 rounded-lg p-2 text-sm mt-1"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                Blocked by
-              </label>
-              <div className="mt-2 space-y-1.5">
-                {cardDependencyIds.length === 0 && (
-                  <p className="text-xs text-gray-400">No dependencies</p>
-                )}
-                {cardDependencyIds.map((depId) => {
-                  const dep = cards.find((c) => c.id === depId);
-                  return (
-                    <div
-                      key={depId}
-                      className="flex items-center justify-between bg-gray-50 border rounded-lg px-3 py-2"
-                    >
-                      <span className="text-sm">
-                        {dep?.title ?? `Card ${depId}`}
-                      </span>
-                      <button
-                        onClick={() =>
-                          handleRemoveDependency(selectedCard.id, depId)
-                        }
-                        className="text-xs text-red-500"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex gap-1 mt-2">
-                <select
-                  value={dependencyTarget[selectedCard.id] ?? ""}
-                  onChange={(e) =>
-                    setDependencyTarget({
-                      ...dependencyTarget,
-                      [selectedCard.id]: e.target.value,
-                    })
-                  }
-                  className="text-xs border rounded flex-1"
-                >
-                  <option value="">Depends on...</option>
-                  {cards
-                    .filter((c) => c.id !== selectedCard.id)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.title}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => handleAddDependency(selectedCard.id)}
-                  className="text-xs bg-gray-200 rounded px-2"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-between pt-2 border-t border-gray-100">
-              <button
-                onClick={() => handleDeleteCard(selectedCard.id)}
-                className="text-sm text-red-600"
-              >
-                Delete card
-              </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedCardId(null)}
-                  className="text-sm border border-gray-300 rounded-lg px-3 py-1.5"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveCardDetails}
-                  className="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CardDetailModal
+          key={selectedCard.id}
+          card={selectedCard}
+          cards={cards}
+          token={token}
+          onClose={() => setSelectedCardId(null)}
+          onToggleComplete={toggleComplete}
+          onSave={handleSaveCardDetails}
+          onDelete={handleDeleteCard}
+          onAddDependency={handleAddDependency}
+          onRemoveDependency={handleRemoveDependency}
+        />
       )}
     </div>
   );
