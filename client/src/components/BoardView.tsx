@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { UserWithoutPassword } from "../types/User";
-import type { Column, Card, Category, Member } from "../types/board";
+import type { Board, Column, Card, Category, Member } from "../types/board";
 import DependencyGraph from "./DependencyGraph";
 import BoardColumnCard from "./BoardColumnCard";
 import BoardMembers from "./BoardMembers";
 import BoardCategories from "./BoardCategories";
 import CardDetailModal from "./CardDetailModal";
+
+const POLL_INTERVAL_MS = 4000;
 
 interface BoardViewProps {
   token: string;
@@ -15,6 +17,9 @@ interface BoardViewProps {
 
 function BoardView({ token, user }: BoardViewProps) {
   const { boardId } = useParams();
+  const navigate = useNavigate();
+  const [board, setBoard] = useState<Board | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [columns, setColumns] = useState<Column[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -22,7 +27,7 @@ function BoardView({ token, user }: BoardViewProps) {
   const [newCardTitle, setNewCardTitle] = useState("");
   const [targetColumnId, setTargetColumnId] = useState<number | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [view, setView] = useState<"list" | "graph">("list");
+  const [view, setView] = useState<"list" | "graph">("graph");
   const [graphVersion, setGraphVersion] = useState(0);
   const [newColumnName, setNewColumnName] = useState("");
 
@@ -30,52 +35,90 @@ function BoardView({ token, user }: BoardViewProps) {
 
   const myRole = members.find((m) => m.userId === user.id)?.role;
   const isOwner = myRole === "OWNER";
+  const canEdit = myRole === "EDITOR" || myRole === "OWNER";
 
   const selectedCard = cards.find((c) => c.id === selectedCardId) ?? null;
+  const readyCards = cards.filter(
+    (c) => unblockedIds.includes(c.id) && !c.isComplete,
+  );
 
   useEffect(() => {
     if (!boardId) return;
 
-    fetch(`http://localhost:8080/api/board/${boardId}/column`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then(async (columnData: Column[]) => {
-        setColumns(columnData);
+    function loadBoardData() {
+      const boardPromise = fetch(`http://localhost:8080/api/board/${boardId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data: Board) => setBoard(data));
 
-        const allCards: Card[] = [];
-        for (const col of columnData) {
-          const res = await fetch(
-            `http://localhost:8080/api/card/column/${col.id}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            },
-          );
-          const cardData: Card[] = await res.json();
-          allCards.push(...cardData);
-        }
-        setCards(allCards);
-      });
+      const columnsPromise = fetch(
+        `http://localhost:8080/api/board/${boardId}/column`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
+        .then((res) => res.json())
+        .then(async (columnData: Column[]) => {
+          setColumns(columnData);
 
-    fetch(`http://localhost:8080/api/board/${boardId}/category`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data: Category[]) =>
-        setCategories(Array.isArray(data) ? data : []),
-      );
+          const allCards: Card[] = [];
+          for (const col of columnData) {
+            const res = await fetch(
+              `http://localhost:8080/api/card/column/${col.id}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              },
+            );
+            const cardData: Card[] = await res.json();
+            allCards.push(...cardData);
+          }
+          setCards(allCards);
+        });
 
-    fetch(`http://localhost:8080/api/board/${boardId}/member`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data: Member[]) => setMembers(Array.isArray(data) ? data : []));
+      const categoriesPromise = fetch(
+        `http://localhost:8080/api/board/${boardId}/category`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
+        .then((res) => res.json())
+        .then((data: Category[]) =>
+          setCategories(Array.isArray(data) ? data : []),
+        );
 
-    fetch(`http://localhost:8080/api/board/${boardId}/unblocked`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((ids: number[]) => setUnblockedIds(Array.isArray(ids) ? ids : []));
+      const membersPromise = fetch(
+        `http://localhost:8080/api/board/${boardId}/member`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
+        .then((res) => res.json())
+        .then((data: Member[]) => setMembers(Array.isArray(data) ? data : []));
+
+      const unblockedPromise = fetch(
+        `http://localhost:8080/api/board/${boardId}/unblocked`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      )
+        .then((res) => res.json())
+        .then((ids: number[]) =>
+          setUnblockedIds(Array.isArray(ids) ? ids : []),
+        );
+
+      Promise.all([
+        boardPromise,
+        columnsPromise,
+        categoriesPromise,
+        membersPromise,
+        unblockedPromise,
+      ]).then(() => setIsLoading(false));
+    }
+
+    loadBoardData();
+    const intervalId = setInterval(loadBoardData, POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
   }, [boardId, token]);
 
   function refreshUnblocked() {
@@ -111,6 +154,26 @@ function BoardView({ token, user }: BoardViewProps) {
       const created: Column = await response.json();
       setColumns([...columns, created]);
       setNewColumnName("");
+    }
+  }
+
+  async function handleDeleteBoard() {
+    if (!boardId) return;
+    if (
+      !window.confirm(
+        "Permanently delete this board? This will delete all its columns, cards, dependencies, and categories.",
+      )
+    ) {
+      return;
+    }
+
+    const response = await fetch(`http://localhost:8080/api/board/${boardId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.ok) {
+      navigate("/");
     }
   }
 
@@ -157,6 +220,26 @@ function BoardView({ token, user }: BoardViewProps) {
 
     if (response.ok) {
       setMembers(members.filter((m) => m.userId !== userId));
+    }
+  }
+
+  async function handleChangeRole(userId: number, role: string) {
+    const response = await fetch(
+      `http://localhost:8080/api/board/${boardId}/member/${userId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ username: "", role }),
+      },
+    );
+
+    if (response.ok) {
+      setMembers(
+        members.map((m) => (m.userId === userId ? { ...m, role } : m)),
+      );
     }
   }
 
@@ -247,6 +330,15 @@ function BoardView({ token, user }: BoardViewProps) {
   }
 
   async function handleDeleteCard(id: number) {
+    const card = cards.find((c) => c.id === id);
+    if (
+      !window.confirm(
+        `Delete "${card?.title ?? "this card"}"? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
     const response = await fetch(`http://localhost:8080/api/card/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -281,8 +373,9 @@ function BoardView({ token, user }: BoardViewProps) {
     card: Card,
     title: string,
     description: string,
+    categoryId: number | null,
   ) {
-    const updated = { ...card, title, description };
+    const updated = { ...card, title, description, categoryId };
 
     const response = await fetch(`http://localhost:8080/api/card/${card.id}`, {
       method: "PUT",
@@ -375,133 +468,178 @@ function BoardView({ token, user }: BoardViewProps) {
     }
   }
 
-  async function handleChangeRole(userId: number, role: string) {
-    const response = await fetch(
-      `http://localhost:8080/api/board/${boardId}/member/${userId}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ username: "", role }),
-      },
-    );
-
-    if (response.ok) {
-      setMembers(
-        members.map((m) => (m.userId === userId ? { ...m, role } : m)),
-      );
-    }
-  }
-
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Board</h1>
-
-      <BoardMembers
-        members={members}
-        currentUserId={user.id}
-        isOwner={isOwner}
-        onRemoveMember={handleRemoveMember}
-        onInviteMember={handleInviteMember}
-      />
-
-      <BoardCategories
-        categories={categories}
-        onAddCategory={handleAddCategory}
-        onDeleteCategory={handleDeleteCategory}
-      />
-
-      {/* View toggle */}
-      <div className="flex bg-gray-100 rounded-lg p-0.5 text-sm mb-4 w-fit">
-        <button
-          onClick={() => setView("graph")}
-          className={`px-3 py-1.5 rounded-md ${view === "graph" ? "bg-white shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          Graph
-        </button>
-        <button
-          onClick={() => setView("list")}
-          className={`px-3 py-1.5 rounded-md ${view === "list" ? "bg-white shadow-sm font-medium" : "text-gray-500"}`}
-        >
-          Board
-        </button>
+      <div className="flex items-center justify-between mb-1">
+        {isLoading ? (
+          <div className="h-7 w-48 bg-gray-200 rounded animate-pulse" />
+        ) : (
+          <h1 className="text-2xl font-bold">{board?.name ?? "Board"}</h1>
+        )}
+        {!isLoading && isOwner && (
+          <button
+            onClick={handleDeleteBoard}
+            className="text-sm text-red-600 border border-red-200 rounded-lg px-3 py-1.5"
+          >
+            Delete board
+          </button>
+        )}
       </div>
 
-      {view === "graph" ? (
-        boardId && (
-          <DependencyGraph
-            token={token}
-            boardId={boardId}
-            refreshKey={graphVersion}
-            unblockedIds={unblockedIds}
-            onNodeClick={(cardId) => setSelectedCardId(cardId)}
-          />
-        )
+      {isLoading ? (
+        <div className="h-4 w-40 bg-gray-100 rounded animate-pulse mb-4 mt-1.5" />
+      ) : (
+        <p className="text-sm text-gray-500 mb-4">
+          {members.length} member{members.length === 1 ? "" : "s"} ·{" "}
+          {cards.length} card{cards.length === 1 ? "" : "s"}
+          {myRole && (
+            <span className="ml-2 text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 align-middle">
+              {myRole}
+            </span>
+          )}
+        </p>
+      )}
+
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+          <div className="h-8 w-8 border-2 border-gray-300 border-t-indigo-600 rounded-full animate-spin mb-3" />
+          <p className="text-sm">Loading board…</p>
+        </div>
       ) : (
         <>
-          <div className="mb-6 border rounded-lg p-4 bg-indigo-50">
-            <h2 className="font-semibold mb-2">Ready to work on right now</h2>
-            <ul className="space-y-1">
-              {cards
-                .filter((c) => unblockedIds.includes(c.id) && !c.isComplete)
-                .map((c) => (
-                  <li key={c.id} className="text-sm">
-                    {c.title}
-                  </li>
-                ))}
-            </ul>
-          </div>
+          <BoardMembers
+            members={members}
+            currentUserId={user.id}
+            isOwner={isOwner}
+            onRemoveMember={handleRemoveMember}
+            onInviteMember={handleInviteMember}
+            onChangeRole={handleChangeRole}
+          />
 
-          <form onSubmit={handleAddCard} className="flex gap-2 mb-6">
-            <select
-              value={targetColumnId ?? ""}
-              onChange={(e) => setTargetColumnId(Number(e.target.value))}
-              className="border rounded-lg px-2"
-            >
-              <option value="" disabled>
-                Choose a column
-              </option>
-              {columns.map((col) => (
-                <option key={col.id} value={col.id}>
-                  {col.name}
-                </option>
-              ))}
-            </select>
-            <input
-              value={newCardTitle}
-              onChange={(e) => setNewCardTitle(e.target.value)}
-              placeholder="New card title"
-              className="border rounded-lg px-3 py-2 flex-1"
-            />
+          <BoardCategories
+            categories={categories}
+            canEdit={canEdit}
+            onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
+
+          {/* View toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-0.5 text-sm mb-4 w-fit">
             <button
-              type="submit"
-              className="bg-indigo-600 text-white rounded-lg px-4 py-2"
+              onClick={() => setView("graph")}
+              className={`px-3 py-1.5 rounded-md ${view === "graph" ? "bg-white shadow-sm font-medium" : "text-gray-500"}`}
             >
-              Add card
+              Graph
             </button>
-          </form>
-
-          <div className="flex gap-4 overflow-x-auto">
-            {columns.map((col) => (
-              <BoardColumnCard
-                key={col.id}
-                column={col}
-                columns={columns}
-                cards={cards}
-                categories={categories}
-                unblockedIds={unblockedIds}
-                onRenameColumn={handleRenameColumn}
-                onDeleteColumn={handleDeleteColumn}
-                onToggleComplete={toggleComplete}
-                onSelectCard={(cardId) => setSelectedCardId(cardId)}
-                onDeleteCard={handleDeleteCard}
-                onAddDependency={handleAddDependency}
-                onMoveCard={handleMoveCard}
-              />
-            ))}
+            <button
+              onClick={() => setView("list")}
+              className={`px-3 py-1.5 rounded-md ${view === "list" ? "bg-white shadow-sm font-medium" : "text-gray-500"}`}
+            >
+              Board
+            </button>
           </div>
+
+          {view === "graph" ? (
+            boardId && (
+              <DependencyGraph
+                token={token}
+                boardId={boardId}
+                refreshKey={graphVersion}
+                unblockedIds={unblockedIds}
+                onNodeClick={(cardId) => setSelectedCardId(cardId)}
+              />
+            )
+          ) : (
+            <>
+              <div className="mb-6 border rounded-lg p-4 bg-indigo-50">
+                <h2 className="font-semibold mb-2">
+                  Ready to work on right now
+                </h2>
+                {readyCards.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    Nothing unblocked right now.
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {readyCards.map((c) => (
+                      <li key={c.id} className="text-sm">
+                        {c.title}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {canEdit && (
+                <form onSubmit={handleAddCard} className="flex gap-2 mb-6">
+                  <select
+                    value={targetColumnId ?? ""}
+                    onChange={(e) => setTargetColumnId(Number(e.target.value))}
+                    className="border rounded-lg px-2"
+                  >
+                    <option value="" disabled>
+                      Choose a column
+                    </option>
+                    {columns.map((col) => (
+                      <option key={col.id} value={col.id}>
+                        {col.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={newCardTitle}
+                    onChange={(e) => setNewCardTitle(e.target.value)}
+                    placeholder="New card title"
+                    className="border rounded-lg px-3 py-2 flex-1"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-indigo-600 text-white rounded-lg px-4 py-2"
+                  >
+                    Add card
+                  </button>
+                </form>
+              )}
+
+              {canEdit && (
+                <form onSubmit={handleAddColumn} className="flex gap-2 mb-6">
+                  <input
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
+                    placeholder="New column name"
+                    className="border rounded-lg px-3 py-2 flex-1"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-gray-700 text-white rounded-lg px-4 py-2"
+                  >
+                    Add column
+                  </button>
+                </form>
+              )}
+
+              <div className="flex gap-4 overflow-x-auto">
+                {columns.map((col) => (
+                  <BoardColumnCard
+                    key={col.id}
+                    column={col}
+                    columns={columns}
+                    cards={cards}
+                    categories={categories}
+                    unblockedIds={unblockedIds}
+                    canEdit={canEdit}
+                    onRenameColumn={handleRenameColumn}
+                    onDeleteColumn={handleDeleteColumn}
+                    onToggleComplete={toggleComplete}
+                    onSelectCard={(cardId) => setSelectedCardId(cardId)}
+                    onDeleteCard={handleDeleteCard}
+                    onAddDependency={handleAddDependency}
+                    onMoveCard={handleMoveCard}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -511,6 +649,8 @@ function BoardView({ token, user }: BoardViewProps) {
           key={selectedCard.id}
           card={selectedCard}
           cards={cards}
+          categories={categories}
+          canEdit={canEdit}
           token={token}
           onClose={() => setSelectedCardId(null)}
           onToggleComplete={toggleComplete}

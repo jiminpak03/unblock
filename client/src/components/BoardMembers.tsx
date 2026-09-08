@@ -7,6 +7,7 @@ interface BoardMembersProps {
   isOwner: boolean;
   onRemoveMember: (userId: number) => void;
   onInviteMember: (username: string, role: string) => Promise<boolean>;
+  onChangeRole: (userId: number, role: string) => void;
 }
 
 function BoardMembers({
@@ -15,6 +16,7 @@ function BoardMembers({
   isOwner,
   onRemoveMember,
   onInviteMember,
+  onChangeRole,
 }: BoardMembersProps) {
   const [usernameToInvite, setUsernameToInvite] = useState("");
   const [targetRole, setTargetRole] = useState<string | null>(null);
@@ -30,9 +32,18 @@ function BoardMembers({
     }
   }
 
+  function handleRemoveMember(member: Member) {
+    if (window.confirm(`Remove ${member.username} from the board?`)) {
+      onRemoveMember(member.userId);
+    }
+  }
+
   return (
     <div className="mb-6">
       <h2 className="font-semibold text-sm mb-2">Members</h2>
+      {members.length === 0 && (
+        <p className="text-sm text-gray-400 mb-4">No members yet.</p>
+      )}
       <ul className="text-sm space-y-1 mb-4">
         {members.map((m) => (
           <li
@@ -41,10 +52,22 @@ function BoardMembers({
           >
             <span>{m.username}</span>
             <span className="flex items-center gap-2">
-              <span className="text-gray-500">{m.role}</span>
+              {isOwner && m.userId !== currentUserId ? (
+                <select
+                  value={m.role}
+                  onChange={(e) => onChangeRole(m.userId, e.target.value)}
+                  className="text-xs border rounded"
+                >
+                  <option value="VIEWER">Viewer</option>
+                  <option value="EDITOR">Editor</option>
+                  <option value="OWNER">Owner</option>
+                </select>
+              ) : (
+                <span className="text-gray-500">{m.role}</span>
+              )}
               {isOwner && m.userId !== currentUserId && (
                 <button
-                  onClick={() => onRemoveMember(m.userId)}
+                  onClick={() => handleRemoveMember(m)}
                   className="text-xs text-red-500"
                 >
                   Remove

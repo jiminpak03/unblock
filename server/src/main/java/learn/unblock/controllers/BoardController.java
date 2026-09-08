@@ -56,6 +56,21 @@ public class BoardController {
         return new ResponseEntity<>(boards, HttpStatus.OK);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<?> findById(@PathVariable int id, @RequestHeader("Authorization") String authHeader) throws DataAccessException {
+        UserWithoutPassword user = getAuthenticatedUser(authHeader);
+
+        if (user == null) {
+            return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+        }
+
+        Board board = boardRepository.findById(id);
+        if (board == null) {
+            return new ResponseEntity<>("Board not found.", HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(board, HttpStatus.OK);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable int id, @RequestHeader("Authorization") String authHeader) throws DataAccessException {
         UserWithoutPassword user = getAuthenticatedUser(authHeader);

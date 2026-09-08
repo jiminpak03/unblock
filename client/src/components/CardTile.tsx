@@ -7,6 +7,7 @@ interface CardTileProps {
   columns: Column[];
   categories: Category[];
   unblockedIds: number[];
+  canEdit: boolean;
   onToggleComplete: (card: Card) => void;
   onSelectCard: (cardId: number) => void;
   onDeleteCard: (id: number) => void;
@@ -23,6 +24,7 @@ function CardTile({
   columns,
   categories,
   unblockedIds,
+  canEdit,
   onToggleComplete,
   onSelectCard,
   onDeleteCard,
@@ -48,14 +50,16 @@ function CardTile({
   return (
     <div
       id={`card-${card.id}`}
-      className="bg-white border rounded-lg p-3 space-y-2"
+      className={`bg-white border rounded-lg p-3 space-y-2 ${
+        isBlocked ? "border-rose-300 bg-rose-50/60" : ""
+      }`}
     >
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm flex-1">
           <input
             type="checkbox"
             checked={card.isComplete}
-            disabled={isBlocked}
+            disabled={isBlocked || !canEdit}
             onChange={() => onToggleComplete(card)}
           />
           {category && (
@@ -78,42 +82,47 @@ function CardTile({
             {card.title}
           </button>
         </label>
-        <button
-          onClick={() => onDeleteCard(card.id)}
-          className="text-xs text-red-500"
-        >
-          ✕
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => onDeleteCard(card.id)}
+            className="text-xs text-red-500"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {isBlocked && <span className="text-xs text-rose-600">blocked</span>}
 
-      <div className="flex gap-1">
-        <select
-          value={dependencyTarget}
-          onChange={(e) => setDependencyTarget(e.target.value)}
-          className="text-xs border rounded flex-1"
-        >
-          <option value="">Depends on...</option>
-          {cards
-            .filter((c) => c.id !== card.id)
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-        </select>
-        <button
-          type="button"
-          onClick={handleAddDependency}
-          className="text-xs bg-gray-200 rounded px-2"
-        >
-          +
-        </button>
-      </div>
+      {canEdit && (
+        <div className="flex gap-1">
+          <select
+            value={dependencyTarget}
+            onChange={(e) => setDependencyTarget(e.target.value)}
+            className="text-xs border rounded flex-1"
+          >
+            <option value="">Depends on...</option>
+            {cards
+              .filter((c) => c.id !== card.id)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleAddDependency}
+            className="text-xs bg-gray-200 rounded px-2"
+          >
+            +
+          </button>
+        </div>
+      )}
 
       <select
         value={moveTarget}
+        disabled={!canEdit}
         onChange={(e) => {
           const newColumnId = Number(e.target.value);
           setMoveTarget(e.target.value);

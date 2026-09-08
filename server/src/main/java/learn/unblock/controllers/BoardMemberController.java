@@ -2,9 +2,11 @@ package learn.unblock.controllers;
 
 import learn.unblock.data.BoardMemberRepository;
 import learn.unblock.data.DataAccessException;
+import learn.unblock.domain.BoardAccessService;
 import learn.unblock.domain.BoardMemberService;
 import learn.unblock.domain.Result;
 import learn.unblock.models.BoardMember;
+import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.InviteMemberRequest;
 import learn.unblock.models.dtos.UserWithoutPassword;
 import learn.unblock.security.JwtConverter;
@@ -19,12 +21,15 @@ public class BoardMemberController {
     private final BoardMemberRepository repository;
     private final JwtConverter jwtConverter;
     private final BoardMemberRepository memberRepository;
+    private final BoardAccessService accessService;
 
-    public BoardMemberController(BoardMemberService service, BoardMemberRepository repository, JwtConverter jwtConverter, BoardMemberRepository memberRepository) {
+    public BoardMemberController(BoardMemberService service, BoardMemberRepository repository, JwtConverter jwtConverter,
+                                  BoardMemberRepository memberRepository, BoardAccessService accessService) {
         this.service = service;
         this.repository = repository;
         this.jwtConverter = jwtConverter;
         this.memberRepository = memberRepository;
+        this.accessService = accessService;
     }
 
     @PostMapping("/{id}/member")
@@ -33,6 +38,10 @@ public class BoardMemberController {
 
         if (user == null) {
             return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+        }
+
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.OWNER)) {
+            return new ResponseEntity<>("Only an owner can invite members.", HttpStatus.FORBIDDEN);
         }
 
         Result<BoardMember> result = service.inviteMember(boardId, request.getUsername(), request.getRole());
@@ -59,6 +68,10 @@ public class BoardMemberController {
         UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
         if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
 
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.OWNER)) {
+            return new ResponseEntity<>("Only an owner can remove members.", HttpStatus.FORBIDDEN);
+        }
+
         memberRepository.delete(boardId, userId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
@@ -69,6 +82,10 @@ public class BoardMemberController {
                                         @RequestHeader("Authorization") String authHeader) {
         UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
         if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.OWNER)) {
+            return new ResponseEntity<>("Only an owner can change member roles.", HttpStatus.FORBIDDEN);
+        }
 
         memberRepository.updateRole(boardId, userId, request.getRole());
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);

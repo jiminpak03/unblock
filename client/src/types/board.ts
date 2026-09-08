@@ -1,3 +1,9 @@
+export interface Board {
+  id: number;
+  name: string;
+  ownerId: number;
+}
+
 export interface Column {
   id: number;
   boardId: number;

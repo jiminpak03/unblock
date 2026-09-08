@@ -1,7 +1,9 @@
 package learn.unblock.controllers;
 
 import learn.unblock.data.CardCategoryRepository;
+import learn.unblock.domain.BoardAccessService;
 import learn.unblock.models.CardCategory;
+import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.CreateCategoryRequest;
 import learn.unblock.security.JwtConverter;
 import learn.unblock.models.dtos.UserWithoutPassword;
@@ -17,10 +19,12 @@ public class CardCategoryController {
 
     private final CardCategoryRepository repository;
     private final JwtConverter jwtConverter;
+    private final BoardAccessService accessService;
 
-    public CardCategoryController(CardCategoryRepository repository, JwtConverter jwtConverter) {
+    public CardCategoryController(CardCategoryRepository repository, JwtConverter jwtConverter, BoardAccessService accessService) {
         this.repository = repository;
         this.jwtConverter = jwtConverter;
+        this.accessService = accessService;
     }
 
     @GetMapping("/{boardId}/category")
@@ -38,6 +42,10 @@ public class CardCategoryController {
             return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
         }
 
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.EDITOR)) {
+            return new ResponseEntity<>("You do not have permission to edit this board.", HttpStatus.FORBIDDEN);
+        }
+
         CardCategory category = new CardCategory();
         category.setBoardId(boardId);
         category.setName(request.getName());
@@ -53,6 +61,12 @@ public class CardCategoryController {
         UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
         if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
 
+        Integer boardId = accessService.boardIdForCategory(id);
+        if (boardId == null) return new ResponseEntity<>("Category not found.", HttpStatus.NOT_FOUND);
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.EDITOR)) {
+            return new ResponseEntity<>("You do not have permission to edit this board.", HttpStatus.FORBIDDEN);
+        }
+
         category.setId(id);
         repository.update(category);
         return new ResponseEntity<>(HttpStatus.OK);
@@ -62,6 +76,12 @@ public class CardCategoryController {
     public ResponseEntity<?> delete(@PathVariable int id, @RequestHeader("Authorization") String authHeader) {
         UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
         if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        Integer boardId = accessService.boardIdForCategory(id);
+        if (boardId == null) return new ResponseEntity<>("Category not found.", HttpStatus.NOT_FOUND);
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.EDITOR)) {
+            return new ResponseEntity<>("You do not have permission to edit this board.", HttpStatus.FORBIDDEN);
+        }
 
         repository.delete(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
