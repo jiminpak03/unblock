@@ -1,7 +1,10 @@
 package learn.unblock.data;
 
-import learn.unblock.models.*;
-import java.time.LocalDateTime;
+import learn.unblock.models.Board;
+import learn.unblock.models.BoardColumn;
+import learn.unblock.models.Card;
+import learn.unblock.models.CardCategory;
+import learn.unblock.models.User;
 
 public class TestDataHelper {
 
