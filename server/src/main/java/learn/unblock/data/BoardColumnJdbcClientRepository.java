@@ -42,6 +42,16 @@ public class BoardColumnJdbcClientRepository implements BoardColumnRepository{
     }
 
     @Override
+    public BoardColumn findById(int id) {
+        final String sql = "select * from board_column where id = ?";
+
+        return jdbcClient.sql(sql)
+                .param(id)
+                .query(new BoardColumnMapper())
+                .optional().orElse(null);
+    }
+
+    @Override
     public List<BoardColumn> findByBoardId(int boardId) {
         final String sql = "select * from board_column where board_id = ?";
 

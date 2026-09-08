@@ -44,6 +44,28 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
   });
 }
 
+function CompletedBadge() {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        background: "#22C55E",
+        color: "white",
+        fontSize: 9,
+        lineHeight: 1,
+        flexShrink: 0,
+      }}
+    >
+      ✓
+    </span>
+  );
+}
+
 function DependencyGraph({
   token,
   boardId,
@@ -53,6 +75,7 @@ function DependencyGraph({
 }: DependencyGraphProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
     fetch(`http://localhost:8080/api/board/${boardId}/graph`, {
@@ -65,7 +88,20 @@ function DependencyGraph({
           return {
             id: String(c.id),
             position: { x: 0, y: 0 },
-            data: { label: c.title },
+            data: {
+              label: (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {c.isComplete && <CompletedBadge />}
+                  <span>{c.title}</span>
+                </span>
+              ),
+            },
             style: {
               border: c.isComplete
                 ? "2px solid #22C55E"
@@ -74,9 +110,11 @@ function DependencyGraph({
                   : "2px solid #6366F1",
               borderStyle: isBlocked ? "dashed" : "solid",
               borderRadius: 8,
-              padding: 8,
+              padding: "10px 14px",
               fontSize: 12,
               background: "white",
+              boxShadow:
+                "0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 8px rgba(15, 23, 42, 0.08)",
             },
           };
         });
@@ -89,6 +127,7 @@ function DependencyGraph({
 
         setNodes(getLayoutedElements(rawNodes, rawEdges));
         setEdges(rawEdges);
+        setHasLoaded(true);
       })
       .catch(console.error);
   }, [boardId, token, refreshKey, unblockedIds]);
@@ -97,6 +136,20 @@ function DependencyGraph({
     (_: React.MouseEvent, node: Node) => onNodeClick(Number(node.id)),
     [onNodeClick],
   );
+
+  if (hasLoaded && nodes.length === 0) {
+    return (
+      <div
+        style={{ height: 500 }}
+        className="border rounded-lg bg-gray-50 flex flex-col items-center justify-center text-gray-400"
+      >
+        <p className="text-sm font-medium">No cards yet</p>
+        <p className="text-xs mt-1">
+          Add a card to see it show up in the dependency graph.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ height: 500 }} className="border rounded-lg bg-gray-50">

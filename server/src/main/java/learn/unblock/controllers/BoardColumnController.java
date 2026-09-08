@@ -1,7 +1,9 @@
 package learn.unblock.controllers;
 
 import learn.unblock.data.BoardColumnRepository;
+import learn.unblock.domain.BoardAccessService;
 import learn.unblock.models.BoardColumn;
+import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.UserWithoutPassword;
 import learn.unblock.security.JwtConverter;
 import org.springframework.http.HttpStatus;
@@ -16,10 +18,12 @@ public class BoardColumnController {
 
     private final BoardColumnRepository repository;
     private final JwtConverter jwtConverter;
+    private final BoardAccessService accessService;
 
-    public BoardColumnController(BoardColumnRepository repository, JwtConverter jwtConverter) {
+    public BoardColumnController(BoardColumnRepository repository, JwtConverter jwtConverter, BoardAccessService accessService) {
         this.repository = repository;
         this.jwtConverter = jwtConverter;
+        this.accessService = accessService;
     }
 
     @GetMapping("/{boardId}/column")
@@ -34,6 +38,12 @@ public class BoardColumnController {
         UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
         if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
 
+        Integer boardId = accessService.boardIdForColumn(id);
+        if (boardId == null) return new ResponseEntity<>("Column not found.", HttpStatus.NOT_FOUND);
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.EDITOR)) {
+            return new ResponseEntity<>("You do not have permission to edit this board.", HttpStatus.FORBIDDEN);
+        }
+
         column.setId(id);
         repository.update(column);
         return new ResponseEntity<>(HttpStatus.OK);
@@ -44,6 +54,12 @@ public class BoardColumnController {
         UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
         if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
 
+        Integer boardId = accessService.boardIdForColumn(id);
+        if (boardId == null) return new ResponseEntity<>("Column not found.", HttpStatus.NOT_FOUND);
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.EDITOR)) {
+            return new ResponseEntity<>("You do not have permission to edit this board.", HttpStatus.FORBIDDEN);
+        }
+
         repository.delete(id);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
@@ -53,6 +69,10 @@ public class BoardColumnController {
                                     @RequestHeader("Authorization") String authHeader) {
         UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
         if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        if (!accessService.hasAtLeast(boardId, user.getId(), MemberRole.EDITOR)) {
+            return new ResponseEntity<>("You do not have permission to edit this board.", HttpStatus.FORBIDDEN);
+        }
 
         column.setBoardId(boardId);
         BoardColumn created = repository.create(column);

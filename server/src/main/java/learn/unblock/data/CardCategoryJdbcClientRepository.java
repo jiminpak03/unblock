@@ -41,6 +41,16 @@ public class CardCategoryJdbcClientRepository implements CardCategoryRepository 
     }
 
     @Override
+    public CardCategory findById(int id) {
+        final String sql = "select * from card_category where id = ?";
+
+        return jdbcClient.sql(sql)
+                .param(id)
+                .query(new CardCategoryMapper())
+                .optional().orElse(null);
+    }
+
+    @Override
     public List<CardCategory> findByBoardId(int boardId) {
         final String sql = "select * from card_category where board_id = ?";
 
