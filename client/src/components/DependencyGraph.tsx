@@ -66,6 +66,32 @@ function CompletedBadge() {
   );
 }
 
+function nodeLabel(card: GraphCard) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {card.isComplete && <CompletedBadge />}
+      <span>{card.title}</span>
+    </span>
+  );
+}
+
+function nodeStyle(isComplete: boolean, isBlocked: boolean) {
+  return {
+    border: isComplete
+      ? "2px solid #22C55E"
+      : isBlocked
+        ? "2px solid #F43F5E"
+        : "2px solid #6366F1",
+    borderStyle: isBlocked ? "dashed" : "solid",
+    borderRadius: 8,
+    padding: "10px 14px",
+    fontSize: 12,
+    background: "white",
+    boxShadow:
+      "0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 8px rgba(15, 23, 42, 0.08)",
+  };
+}
+
 function DependencyGraph({
   token,
   boardId,
@@ -75,6 +101,7 @@ function DependencyGraph({
 }: DependencyGraphProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [graphCards, setGraphCards] = useState<GraphCard[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
@@ -83,41 +110,8 @@ function DependencyGraph({
     })
       .then((res) => res.json())
       .then((data: { nodes: GraphCard[]; edges: GraphEdgeData[] }) => {
-        const rawNodes: Node[] = (data.nodes ?? []).map((c) => {
-          const isBlocked = !unblockedIds.includes(c.id) && !c.isComplete;
-          return {
-            id: String(c.id),
-            position: { x: 0, y: 0 },
-            data: {
-              label: (
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  {c.isComplete && <CompletedBadge />}
-                  <span>{c.title}</span>
-                </span>
-              ),
-            },
-            style: {
-              border: c.isComplete
-                ? "2px solid #22C55E"
-                : isBlocked
-                  ? "2px solid #F43F5E"
-                  : "2px solid #6366F1",
-              borderStyle: isBlocked ? "dashed" : "solid",
-              borderRadius: 8,
-              padding: "10px 14px",
-              fontSize: 12,
-              background: "white",
-              boxShadow:
-                "0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 8px rgba(15, 23, 42, 0.08)",
-            },
-          };
-        });
+        const cards = data.nodes ?? [];
+        setGraphCards(cards);
 
         const rawEdges: Edge[] = (data.edges ?? []).map((e) => ({
           id: `${e.dependsOnCardId}-${e.cardId}`,
@@ -125,12 +119,40 @@ function DependencyGraph({
           target: String(e.cardId),
         }));
 
+        const rawNodes: Node[] = cards.map((c) => ({
+          id: String(c.id),
+          position: { x: 0, y: 0 },
+          data: { label: nodeLabel(c) },
+          style: nodeStyle(c.isComplete, false),
+        }));
+
         setNodes(getLayoutedElements(rawNodes, rawEdges));
         setEdges(rawEdges);
         setHasLoaded(true);
       })
       .catch(console.error);
-  }, [boardId, token, refreshKey, unblockedIds]);
+  }, [boardId, token, refreshKey, setNodes, setEdges]);
+
+  // Re-style nodes (blocked / complete) when the unblocked set changes,
+  // without disturbing their positions. Keyed on a stable string so the
+  // board's 4s polling (new array, same contents) doesn't churn the graph.
+  const unblockedKey = [...unblockedIds].sort((a, b) => a - b).join(",");
+  useEffect(() => {
+    setNodes((current) =>
+      current.map((n) => {
+        const card = graphCards.find((c) => String(c.id) === n.id);
+        if (!card) return n;
+        const isBlocked =
+          !unblockedIds.includes(card.id) && !card.isComplete;
+        return {
+          ...n,
+          data: { label: nodeLabel(card) },
+          style: nodeStyle(card.isComplete, isBlocked),
+        };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unblockedKey, graphCards, setNodes]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => onNodeClick(Number(node.id)),

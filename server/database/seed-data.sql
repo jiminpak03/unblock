@@ -2,12 +2,12 @@ use unblock;
 
 -- password for every seeded user: password
 insert into user (username, password_hash) values
-	('jordan.reyes', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
-	('priya.natarajan', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
-	('sam.oconnor', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
-	('wei.chen', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
-	('amara.okafor', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
-	('liam.bennett', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K');
+	('testuser1', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
+	('testuser2', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
+	('testuser3', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
+	('testuser4', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
+	('testuser5', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K'),
+	('testuser6', '$2a$10$YfhIpdTMTF9E3GU8mpIIwOd7uYTvKjLt2BfTQV.rOB/tXTjc/l37K');
 
 -- Three boards showing different kinds of projects: a game dev board, a
 -- household project, and a community/nonprofit event board. Users overlap

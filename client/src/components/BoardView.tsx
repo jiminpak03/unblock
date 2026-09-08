@@ -454,6 +454,34 @@ function BoardView({ token, user }: BoardViewProps) {
     return false;
   }
 
+  async function handleUpdateCategory(
+    category: Category,
+    name: string,
+    color: string,
+  ): Promise<boolean> {
+    const updated = { ...category, name, color };
+
+    const response = await fetch(
+      `http://localhost:8080/api/board/category/${category.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updated),
+      },
+    );
+
+    if (response.ok) {
+      setCategories(
+        categories.map((c) => (c.id === category.id ? updated : c)),
+      );
+      return true;
+    }
+    return false;
+  }
+
   async function handleDeleteCategory(id: number) {
     const response = await fetch(
       `http://localhost:8080/api/board/category/${id}`,
@@ -520,6 +548,7 @@ function BoardView({ token, user }: BoardViewProps) {
             categories={categories}
             canEdit={canEdit}
             onAddCategory={handleAddCategory}
+            onUpdateCategory={handleUpdateCategory}
             onDeleteCategory={handleDeleteCategory}
           />
 
