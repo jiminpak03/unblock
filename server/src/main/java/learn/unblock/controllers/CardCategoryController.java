@@ -46,4 +46,24 @@ public class CardCategoryController {
         CardCategory created = repository.create(category);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
+
+    @PutMapping("/category/{id}")
+    public ResponseEntity<?> update(@PathVariable int id, @RequestBody CardCategory category,
+                                    @RequestHeader("Authorization") String authHeader) {
+        UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
+        if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        category.setId(id);
+        repository.update(category);
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    @DeleteMapping("/category/{id}")
+    public ResponseEntity<?> delete(@PathVariable int id, @RequestHeader("Authorization") String authHeader) {
+        UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
+        if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        repository.delete(id);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
 }

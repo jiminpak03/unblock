@@ -1,5 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
-import { ReactFlow, Background, Controls, useNodesState, useEdgesState, type Node, type Edge } from "@xyflow/react";
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  useNodesState,
+  useEdgesState,
+  type Node,
+  type Edge,
+} from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
 
 interface GraphCard {
@@ -16,6 +24,8 @@ interface GraphEdgeData {
 interface DependencyGraphProps {
   token: string;
   boardId: string;
+  refreshKey: number;
+  unblockedIds: number[];
   onNodeClick: (cardId: number) => void;
 }
 
@@ -34,7 +44,13 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
   });
 }
 
-function DependencyGraph({ token, boardId, onNodeClick }: DependencyGraphProps) {
+function DependencyGraph({
+  token,
+  boardId,
+  refreshKey,
+  unblockedIds,
+  onNodeClick,
+}: DependencyGraphProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
@@ -44,18 +60,26 @@ function DependencyGraph({ token, boardId, onNodeClick }: DependencyGraphProps) 
     })
       .then((res) => res.json())
       .then((data: { nodes: GraphCard[]; edges: GraphEdgeData[] }) => {
-        const rawNodes: Node[] = (data.nodes ?? []).map((c) => ({
-          id: String(c.id),
-          position: { x: 0, y: 0 },
-          data: { label: c.title },
-          style: {
-            border: c.isComplete ? "2px solid #22C55E" : "2px solid #6366F1",
-            borderRadius: 8,
-            padding: 8,
-            fontSize: 12,
-            background: "white",
-          },
-        }));
+        const rawNodes: Node[] = (data.nodes ?? []).map((c) => {
+          const isBlocked = !unblockedIds.includes(c.id) && !c.isComplete;
+          return {
+            id: String(c.id),
+            position: { x: 0, y: 0 },
+            data: { label: c.title },
+            style: {
+              border: c.isComplete
+                ? "2px solid #22C55E"
+                : isBlocked
+                  ? "2px solid #F43F5E"
+                  : "2px solid #6366F1",
+              borderStyle: isBlocked ? "dashed" : "solid",
+              borderRadius: 8,
+              padding: 8,
+              fontSize: 12,
+              background: "white",
+            },
+          };
+        });
 
         const rawEdges: Edge[] = (data.edges ?? []).map((e) => ({
           id: `${e.dependsOnCardId}-${e.cardId}`,
@@ -67,7 +91,7 @@ function DependencyGraph({ token, boardId, onNodeClick }: DependencyGraphProps) 
         setEdges(rawEdges);
       })
       .catch(console.error);
-  }, [boardId, token]);
+  }, [boardId, token, refreshKey, unblockedIds]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => onNodeClick(Number(node.id)),

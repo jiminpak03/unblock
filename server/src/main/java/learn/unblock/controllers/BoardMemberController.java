@@ -18,11 +18,13 @@ public class BoardMemberController {
     private final BoardMemberService service;
     private final BoardMemberRepository repository;
     private final JwtConverter jwtConverter;
+    private final BoardMemberRepository memberRepository;
 
-    public BoardMemberController(BoardMemberService service, BoardMemberRepository repository, JwtConverter jwtConverter) {
+    public BoardMemberController(BoardMemberService service, BoardMemberRepository repository, JwtConverter jwtConverter, BoardMemberRepository memberRepository) {
         this.service = service;
         this.repository = repository;
         this.jwtConverter = jwtConverter;
+        this.memberRepository = memberRepository;
     }
 
     @PostMapping("/{id}/member")
@@ -49,5 +51,26 @@ public class BoardMemberController {
     private UserWithoutPassword getAuthenticatedUser(String authHeader) {
         String token = authHeader.replace("Bearer ", "");
         return jwtConverter.getUserFromToken(token);
+    }
+
+    @DeleteMapping("/{boardId}/member/{userId}")
+    public ResponseEntity<?> removeMember(@PathVariable int boardId, @PathVariable int userId,
+                                          @RequestHeader("Authorization") String authHeader) {
+        UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
+        if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        memberRepository.delete(boardId, userId);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
+
+    @PutMapping("/{boardId}/member/{userId}")
+    public ResponseEntity<?> changeRole(@PathVariable int boardId, @PathVariable int userId,
+                                        @RequestBody InviteMemberRequest request,
+                                        @RequestHeader("Authorization") String authHeader) {
+        UserWithoutPassword user = jwtConverter.getUserFromToken(authHeader.replace("Bearer ", ""));
+        if (user == null) return new ResponseEntity<>("Invalid or missing token.", HttpStatus.UNAUTHORIZED);
+
+        memberRepository.updateRole(boardId, userId, request.getRole());
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

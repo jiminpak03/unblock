@@ -7,4 +7,6 @@ import java.util.List;
 public interface BoardColumnRepository {
     BoardColumn create(BoardColumn column);
     List<BoardColumn> findByBoardId(int boardId);
+    boolean update(BoardColumn column);
+    boolean delete(int id);
 }

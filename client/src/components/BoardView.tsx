@@ -20,9 +20,11 @@ interface Card {
   position: number;
 }
 
-interface BoardViewProps {
-  token: string;
-  user: UserWithoutPassword;
+interface Category {
+  id: number;
+  boardId: number;
+  name: string;
+  color: string;
 }
 
 interface Member {
@@ -31,25 +33,39 @@ interface Member {
   role: string;
 }
 
+interface BoardViewProps {
+  token: string;
+  user: UserWithoutPassword;
+}
+
 function BoardView({ token, user }: BoardViewProps) {
   const { boardId } = useParams();
   const [columns, setColumns] = useState<Column[]>([]);
   const [cards, setCards] = useState<Card[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [unblockedIds, setUnblockedIds] = useState<number[]>([]);
   const [newCardTitle, setNewCardTitle] = useState("");
   const [targetColumnId, setTargetColumnId] = useState<number | null>(null);
-  const [moveTarget, setMoveTarget] = useState<{ [cardId: number]: string }>({});
-  const [dependencyTarget, setDependencyTarget] = useState<{ [cardId: number]: string }>({});
+  const [moveTarget, setMoveTarget] = useState<{ [cardId: number]: string }>(
+    {},
+  );
+  const [dependencyTarget, setDependencyTarget] = useState<{
+    [cardId: number]: string;
+  }>({});
   const [usernameToInvite, setUsernameToInvite] = useState("");
   const [targetRole, setTargetRole] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [view, setView] = useState<"list" | "graph">("list");
+  const [graphVersion, setGraphVersion] = useState(0);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState("#8b5cf6");
+  const [newColumnName, setNewColumnName] = useState("");
 
-  // Expanded card view
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [cardDependencyIds, setCardDependencyIds] = useState<number[]>([]);
+  const [columnEdits, setColumnEdits] = useState<{ [id: number]: string }>({});
 
   const myRole = members.find((m) => m.userId === user.id)?.role;
   const isOwner = myRole === "OWNER";
@@ -68,14 +84,25 @@ function BoardView({ token, user }: BoardViewProps) {
 
         const allCards: Card[] = [];
         for (const col of columnData) {
-          const res = await fetch(`http://localhost:8080/api/card/column/${col.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const res = await fetch(
+            `http://localhost:8080/api/card/column/${col.id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          );
           const cardData: Card[] = await res.json();
           allCards.push(...cardData);
         }
         setCards(allCards);
       });
+
+    fetch(`http://localhost:8080/api/board/${boardId}/category`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data: Category[]) =>
+        setCategories(Array.isArray(data) ? data : []),
+      );
 
     fetch(`http://localhost:8080/api/board/${boardId}/member`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -90,7 +117,6 @@ function BoardView({ token, user }: BoardViewProps) {
       .then((ids: number[]) => setUnblockedIds(Array.isArray(ids) ? ids : []));
   }, [boardId, token]);
 
-  // Sync edit fields and dependency list whenever the selected card changes
   useEffect(() => {
     if (!selectedCard) return;
     setEditTitle(selectedCard.title);
@@ -100,7 +126,9 @@ function BoardView({ token, user }: BoardViewProps) {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
-      .then((ids: number[]) => setCardDependencyIds(Array.isArray(ids) ? ids : []))
+      .then((ids: number[]) =>
+        setCardDependencyIds(Array.isArray(ids) ? ids : []),
+      )
       .catch(() => setCardDependencyIds([]));
   }, [selectedCardId]);
 
@@ -112,29 +140,77 @@ function BoardView({ token, user }: BoardViewProps) {
       .then((ids: number[]) => setUnblockedIds(Array.isArray(ids) ? ids : []));
   }
 
+  function notifyChanged() {
+    refreshUnblocked();
+    setGraphVersion((v) => v + 1);
+  }
+
+  async function handleAddColumn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newColumnName || !boardId) return;
+
+    const response = await fetch(
+      `http://localhost:8080/api/board/${boardId}/column`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: newColumnName, position: columns.length }),
+      },
+    );
+
+    if (response.ok) {
+      const created: Column = await response.json();
+      setColumns([...columns, created]);
+      setNewColumnName("");
+    }
+  }
+
   async function handleInviteMember(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!usernameToInvite || !targetRole) return;
 
-    const response = await fetch(`http://localhost:8080/api/board/${boardId}/member`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const response = await fetch(
+      `http://localhost:8080/api/board/${boardId}/member`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ username: usernameToInvite, role: targetRole }),
       },
-      body: JSON.stringify({ username: usernameToInvite, role: targetRole }),
-    });
+    );
 
     if (response.ok) {
-      const updated = await fetch(`http://localhost:8080/api/board/${boardId}/member`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => res.json());
+      const updated = await fetch(
+        `http://localhost:8080/api/board/${boardId}/member`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      ).then((res) => res.json());
       setMembers(updated);
       setUsernameToInvite("");
       setTargetRole(null);
     } else {
       const errors = await response.json();
       alert(errors[0] ?? "Could not invite member.");
+    }
+  }
+
+  async function handleRemoveMember(userId: number) {
+    const response = await fetch(
+      `http://localhost:8080/api/board/${boardId}/member/${userId}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (response.ok) {
+      setMembers(members.filter((m) => m.userId !== userId));
     }
   }
 
@@ -155,6 +231,7 @@ function BoardView({ token, user }: BoardViewProps) {
       const created: Card = await response.json();
       setCards([...cards, created]);
       setNewCardTitle("");
+      setGraphVersion((v) => v + 1);
     }
   }
 
@@ -162,17 +239,20 @@ function BoardView({ token, user }: BoardViewProps) {
     const dependsOnCardId = Number(dependencyTarget[cardId]);
     if (!dependsOnCardId) return;
 
-    const response = await fetch(`http://localhost:8080/api/card/${cardId}/dependency`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const response = await fetch(
+      `http://localhost:8080/api/card/${cardId}/dependency`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ dependsOnCardId }),
       },
-      body: JSON.stringify({ dependsOnCardId }),
-    });
+    );
 
     if (response.ok) {
-      refreshUnblocked();
+      notifyChanged();
       setDependencyTarget({ ...dependencyTarget, [cardId]: "" });
       if (selectedCardId === cardId) {
         setCardDependencyIds([...cardDependencyIds, dependsOnCardId]);
@@ -183,7 +263,10 @@ function BoardView({ token, user }: BoardViewProps) {
     }
   }
 
-  async function handleRemoveDependency(cardId: number, dependsOnCardId: number) {
+  async function handleRemoveDependency(
+    cardId: number,
+    dependsOnCardId: number,
+  ) {
     const response = await fetch(
       `http://localhost:8080/api/card/${cardId}/dependency/${dependsOnCardId}`,
       {
@@ -193,8 +276,10 @@ function BoardView({ token, user }: BoardViewProps) {
     );
 
     if (response.ok) {
-      setCardDependencyIds(cardDependencyIds.filter((id) => id !== dependsOnCardId));
-      refreshUnblocked();
+      setCardDependencyIds(
+        cardDependencyIds.filter((id) => id !== dependsOnCardId),
+      );
+      notifyChanged();
     }
   }
 
@@ -212,7 +297,7 @@ function BoardView({ token, user }: BoardViewProps) {
 
     if (response.ok) {
       setCards(cards.map((c) => (c.id === card.id ? updated : c)));
-      refreshUnblocked();
+      notifyChanged();
     }
   }
 
@@ -225,7 +310,7 @@ function BoardView({ token, user }: BoardViewProps) {
     if (response.ok) {
       setCards(cards.filter((c) => c.id !== id));
       if (selectedCardId === id) setSelectedCardId(null);
-      refreshUnblocked();
+      notifyChanged();
     }
   }
 
@@ -243,26 +328,129 @@ function BoardView({ token, user }: BoardViewProps) {
 
     if (response.ok) {
       setCards(cards.map((c) => (c.id === card.id ? updated : c)));
-      refreshUnblocked();
+      notifyChanged();
     }
   }
 
   async function handleSaveCardDetails() {
     if (!selectedCard) return;
-    const updated = { ...selectedCard, title: editTitle, description: editDescription };
+    const updated = {
+      ...selectedCard,
+      title: editTitle,
+      description: editDescription,
+    };
 
-    const response = await fetch(`http://localhost:8080/api/card/${selectedCard.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const response = await fetch(
+      `http://localhost:8080/api/card/${selectedCard.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(updated),
       },
-      body: JSON.stringify(updated),
-    });
+    );
 
     if (response.ok) {
       setCards(cards.map((c) => (c.id === selectedCard.id ? updated : c)));
       setSelectedCardId(null);
+      setGraphVersion((v) => v + 1);
+    }
+  }
+
+  async function handleRenameColumn(column: Column, newName: string) {
+    const response = await fetch(
+      `http://localhost:8080/api/board/column/${column.id}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ...column, name: newName }),
+      },
+    );
+
+    if (response.ok) {
+      setColumns(
+        columns.map((c) => (c.id === column.id ? { ...c, name: newName } : c)),
+      );
+    }
+  }
+
+  async function handleDeleteColumn(id: number) {
+    const response = await fetch(
+      `http://localhost:8080/api/board/column/${id}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (response.ok) {
+      setColumns(columns.filter((c) => c.id !== id));
+      setCards(cards.filter((c) => c.columnId !== id));
+    }
+  }
+
+  async function handleAddCategory(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!newCategoryName || !boardId) return;
+
+    const response = await fetch(
+      `http://localhost:8080/api/board/${boardId}/category`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newCategoryName,
+          color: newCategoryColor,
+        }),
+      },
+    );
+
+    if (response.ok) {
+      const created: Category = await response.json();
+      setCategories([...categories, created]);
+      setNewCategoryName("");
+    }
+  }
+
+  async function handleDeleteCategory(id: number) {
+    const response = await fetch(
+      `http://localhost:8080/api/board/category/${id}`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (response.ok) {
+      setCategories(categories.filter((c) => c.id !== id));
+    }
+  }
+
+  async function handleChangeRole(userId: number, role: string) {
+    const response = await fetch(
+      `http://localhost:8080/api/board/${boardId}/member/${userId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ username: "", role }),
+      },
+    );
+
+    if (response.ok) {
+      setMembers(
+        members.map((m) => (m.userId === userId ? { ...m, role } : m)),
+      );
     }
   }
 
@@ -270,14 +458,27 @@ function BoardView({ token, user }: BoardViewProps) {
     <div>
       <h1 className="text-2xl font-bold mb-4">Board</h1>
 
-      {/* Members — always visible, both views */}
+      {/* Members */}
       <div className="mb-6">
         <h2 className="font-semibold text-sm mb-2">Members</h2>
         <ul className="text-sm space-y-1 mb-4">
           {members.map((m) => (
-            <li key={m.userId} className="flex justify-between max-w-xs">
+            <li
+              key={m.userId}
+              className="flex justify-between max-w-xs items-center"
+            >
               <span>{m.username}</span>
-              <span className="text-gray-500">{m.role}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-gray-500">{m.role}</span>
+                {isOwner && m.userId !== user.id && (
+                  <button
+                    onClick={() => handleRemoveMember(m.userId)}
+                    className="text-xs text-red-500"
+                  >
+                    Remove
+                  </button>
+                )}
+              </span>
             </li>
           ))}
         </ul>
@@ -302,11 +503,56 @@ function BoardView({ token, user }: BoardViewProps) {
               <option value="EDITOR">Editor</option>
               <option value="OWNER">Owner</option>
             </select>
-            <button type="submit" className="bg-indigo-600 text-white rounded-lg px-4 py-2">
+            <button
+              type="submit"
+              className="bg-indigo-600 text-white rounded-lg px-4 py-2"
+            >
               Invite
             </button>
           </form>
         )}
+      </div>
+
+      {/* Categories */}
+      <div className="mb-6">
+        <h2 className="font-semibold text-sm mb-2">Categories</h2>
+        <div className="flex gap-2 mb-2 flex-wrap">
+          {categories.map((cat) => (
+            <span
+              key={cat.id}
+              className="text-xs bg-gray-100 rounded-full px-2 py-1 flex items-center gap-1"
+            >
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: cat.color }}
+              />
+              {cat.name}
+              <button
+                onClick={() => handleDeleteCategory(cat.id)}
+                className="text-red-500"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+        <form onSubmit={handleAddCategory} className="flex gap-2">
+          <input
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            placeholder="Category name"
+            className="border rounded-lg px-2 py-1 text-sm flex-1"
+          />
+          <input
+            type="color"
+            value={newCategoryColor}
+            onChange={(e) => setNewCategoryColor(e.target.value)}
+            className="w-10 h-8 border rounded"
+          />
+          <button type="submit" className="text-sm bg-gray-200 rounded-lg px-3">
+            Add
+          </button>
+        </form>
       </div>
 
       {/* View toggle */}
@@ -330,12 +576,13 @@ function BoardView({ token, user }: BoardViewProps) {
           <DependencyGraph
             token={token}
             boardId={boardId}
+            refreshKey={graphVersion}
+            unblockedIds={unblockedIds}
             onNodeClick={(cardId) => setSelectedCardId(cardId)}
           />
         )
       ) : (
         <>
-          {/* Ready to work on */}
           <div className="mb-6 border rounded-lg p-4 bg-indigo-50">
             <h2 className="font-semibold mb-2">Ready to work on right now</h2>
             <ul className="space-y-1">
@@ -349,7 +596,6 @@ function BoardView({ token, user }: BoardViewProps) {
             </ul>
           </div>
 
-          {/* Add card form */}
           <form onSubmit={handleAddCard} className="flex gap-2 mb-6">
             <select
               value={targetColumnId ?? ""}
@@ -371,21 +617,54 @@ function BoardView({ token, user }: BoardViewProps) {
               placeholder="New card title"
               className="border rounded-lg px-3 py-2 flex-1"
             />
-            <button type="submit" className="bg-indigo-600 text-white rounded-lg px-4 py-2">
+            <button
+              type="submit"
+              className="bg-indigo-600 text-white rounded-lg px-4 py-2"
+            >
               Add card
             </button>
           </form>
 
-          {/* Columns/cards */}
           <div className="flex gap-4 overflow-x-auto">
             {columns.map((col) => (
-              <div key={col.id} className="bg-gray-50 rounded-lg p-3 w-64 shrink-0">
-                <h3 className="font-semibold mb-2">{col.name}</h3>
+              <div
+                key={col.id}
+                className="bg-gray-50 rounded-lg p-3 w-64 shrink-0"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <input
+                    value={columnEdits[col.id] ?? col.name}
+                    onChange={(e) =>
+                      setColumnEdits({
+                        ...columnEdits,
+                        [col.id]: e.target.value,
+                      })
+                    }
+                    onBlur={() => {
+                      if (
+                        columnEdits[col.id] &&
+                        columnEdits[col.id] !== col.name
+                      ) {
+                        handleRenameColumn(col, columnEdits[col.id]);
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => handleDeleteColumn(col.id)}
+                    className="text-xs text-red-500 ml-1"
+                  >
+                    ✕
+                  </button>
+                </div>
                 <div className="space-y-2">
                   {cards
                     .filter((c) => c.columnId === col.id)
                     .map((card) => {
-                      const isBlocked = !unblockedIds.includes(card.id) && !card.isComplete;
+                      const isBlocked =
+                        !unblockedIds.includes(card.id) && !card.isComplete;
+                      const category = categories.find(
+                        (cat) => cat.id === card.categoryId,
+                      );
 
                       return (
                         <div
@@ -401,6 +680,12 @@ function BoardView({ token, user }: BoardViewProps) {
                                 disabled={isBlocked}
                                 onChange={() => toggleComplete(card)}
                               />
+                              {category && (
+                                <span
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{ backgroundColor: category.color }}
+                                />
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setSelectedCardId(card.id)}
@@ -423,13 +708,20 @@ function BoardView({ token, user }: BoardViewProps) {
                             </button>
                           </div>
 
-                          {isBlocked && <span className="text-xs text-rose-600">blocked</span>}
+                          {isBlocked && (
+                            <span className="text-xs text-rose-600">
+                              blocked
+                            </span>
+                          )}
 
                           <div className="flex gap-1">
                             <select
                               value={dependencyTarget[card.id] ?? ""}
                               onChange={(e) =>
-                                setDependencyTarget({ ...dependencyTarget, [card.id]: e.target.value })
+                                setDependencyTarget({
+                                  ...dependencyTarget,
+                                  [card.id]: e.target.value,
+                                })
                               }
                               className="text-xs border rounded flex-1"
                             >
@@ -455,7 +747,10 @@ function BoardView({ token, user }: BoardViewProps) {
                             value={moveTarget[card.id] ?? String(card.columnId)}
                             onChange={(e) => {
                               const newColumnId = Number(e.target.value);
-                              setMoveTarget({ ...moveTarget, [card.id]: e.target.value });
+                              setMoveTarget({
+                                ...moveTarget,
+                                [card.id]: e.target.value,
+                              });
                               handleMoveCard(card, newColumnId);
                             }}
                             className="text-xs border rounded w-full"
@@ -476,7 +771,7 @@ function BoardView({ token, user }: BoardViewProps) {
         </>
       )}
 
-      {/* Expanded card view (modal) */}
+      {/* Expanded card view */}
       {selectedCard && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
@@ -492,7 +787,10 @@ function BoardView({ token, user }: BoardViewProps) {
                 onChange={(e) => setEditTitle(e.target.value)}
                 className="text-lg font-bold w-full outline-none border-b border-transparent focus:border-gray-200"
               />
-              <button onClick={() => setSelectedCardId(null)} className="text-gray-400 ml-2">
+              <button
+                onClick={() => setSelectedCardId(null)}
+                className="text-gray-400 ml-2"
+              >
                 ✕
               </button>
             </div>
@@ -533,9 +831,13 @@ function BoardView({ token, user }: BoardViewProps) {
                       key={depId}
                       className="flex items-center justify-between bg-gray-50 border rounded-lg px-3 py-2"
                     >
-                      <span className="text-sm">{dep?.title ?? `Card ${depId}`}</span>
+                      <span className="text-sm">
+                        {dep?.title ?? `Card ${depId}`}
+                      </span>
                       <button
-                        onClick={() => handleRemoveDependency(selectedCard.id, depId)}
+                        onClick={() =>
+                          handleRemoveDependency(selectedCard.id, depId)
+                        }
                         className="text-xs text-red-500"
                       >
                         Remove
@@ -549,7 +851,10 @@ function BoardView({ token, user }: BoardViewProps) {
                 <select
                   value={dependencyTarget[selectedCard.id] ?? ""}
                   onChange={(e) =>
-                    setDependencyTarget({ ...dependencyTarget, [selectedCard.id]: e.target.value })
+                    setDependencyTarget({
+                      ...dependencyTarget,
+                      [selectedCard.id]: e.target.value,
+                    })
                   }
                   className="text-xs border rounded flex-1"
                 >
