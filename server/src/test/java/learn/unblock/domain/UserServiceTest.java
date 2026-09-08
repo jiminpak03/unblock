@@ -8,6 +8,7 @@ import learn.unblock.models.dtos.UserWithoutPassword;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,68 +21,89 @@ class UserServiceTest {
     @Autowired
     UserService service;
 
+    @Autowired
+    BCryptPasswordEncoder encoder;
+
     @MockitoBean
     UserRepository repository;
 
     @Test
-    void createFailsWhenUsernameIsBlank() throws DataAccessException {
-        User toCreate = TestDataHelper.userToCreate();
-        toCreate.setUsername("");
+    void registerShouldFailWhenUsernameBlank() throws DataAccessException {
+        Result<UserWithoutPassword> result = service.register("", "password123");
 
-        Result<User> actual = service.create(toCreate);
-
-        assertEquals(ResultType.INVALID, actual.getResultType());
-        assertTrue(actual.getErrorMessages().contains("Username cannot be blank"));
-    }
-
-    @Test
-    void createFailsWhenPasswordIsBlank() throws DataAccessException {
-        User toCreate = TestDataHelper.userToCreate();
-        toCreate.setPassword("");
-
-        Result<User> actual = service.create(toCreate);
-
-        assertEquals(ResultType.INVALID, actual.getResultType());
-        assertTrue(actual.getErrorMessages().contains("Password cannot be blank"));
-    }
-
-    @Test
-    void createFailsWhenUsernameIsDuplicated() throws DataAccessException {
-        when(repository.findByUsername(TestDataHelper.userToCreate().getUsername())).thenReturn(TestDataHelper.existingUser());
-
-        Result<User> actual = service.create(TestDataHelper.userToCreate());
-
-        assertEquals(ResultType.INVALID, actual.getResultType());
-        assertTrue(actual.getErrorMessages().contains("Username is already taken"));
-    }
-
-    @Test
-    void createHappyPath() throws DataAccessException {
-        when(repository.create(TestDataHelper.userToCreate())).thenReturn(TestDataHelper.userAfterCreate());
-
-        Result<User> actual = service.create(TestDataHelper.userToCreate());
-
-        assertTrue(actual.isSuccess());
-        assertEquals(TestDataHelper.userAfterCreate(), actual.getpayload());
-    }
-
-    @Test
-    void registerFailsWhenUsernameIsBlank() throws DataAccessException {
-        Result<UserWithoutPassword> actual = service.register("", "password123");
-
-        assertEquals(ResultType.INVALID, actual.getResultType());
-        assertTrue(actual.getErrorMessages().contains("Username cannot be blank"));
+        assertEquals(ResultType.INVALID, result.getResultType());
         verify(repository, never()).create(any());
     }
 
     @Test
-    void registerHappyPath() throws DataAccessException {
-        when(repository.findByUsername("test")).thenReturn(null);
-        when(repository.create(any())).thenReturn(TestDataHelper.userAfterCreate());
+    void registerShouldFailWhenPasswordBlank() throws DataAccessException {
+        Result<UserWithoutPassword> result = service.register("newuser", "");
 
-        Result<UserWithoutPassword> actual = service.register("test", "password123");
+        assertEquals(ResultType.INVALID, result.getResultType());
+        verify(repository, never()).create(any());
+    }
 
-        assertTrue(actual.isSuccess());
-        assertEquals("test", actual.getpayload().getUsername());
+    @Test
+    void registerShouldFailWhenUsernameTaken() throws DataAccessException {
+        when(repository.findByUsername("mallardmike")).thenReturn(TestDataHelper.existingUser());
+
+        Result<UserWithoutPassword> result = service.register("mallardmike", "password123");
+
+        assertEquals(ResultType.INVALID, result.getResultType());
+        verify(repository, never()).create(any());
+    }
+
+    @Test
+    void registerShouldSucceedAndHashPassword() throws DataAccessException {
+        when(repository.findByUsername("newuser")).thenReturn(null);
+        when(repository.create(any())).thenAnswer(invocation -> {
+            User passed = invocation.getArgument(0);
+            // the password reaching the repository must NOT be the plaintext
+            assertNotEquals("password123", passed.getPassword());
+            assertTrue(encoder.matches("password123", passed.getPassword()));
+            passed.setId(4);
+            return passed;
+        });
+
+        Result<UserWithoutPassword> result = service.register("newuser", "password123");
+
+        assertTrue(result.isSuccess());
+        assertEquals("newuser", result.getpayload().getUsername());
+    }
+
+    @Test
+    void loginShouldFailForUnknownUsername() throws DataAccessException {
+        when(repository.findByUsername("nobody")).thenReturn(null);
+
+        Result<UserWithoutPassword> result = service.login("nobody", "password123");
+
+        assertEquals(ResultType.INVALID, result.getResultType());
+    }
+
+    @Test
+    void loginShouldFailForWrongPassword() throws DataAccessException {
+        User stored = new User();
+        stored.setId(1);
+        stored.setUsername("mallardmike");
+        stored.setPassword(encoder.encode("correctpassword"));
+        when(repository.findByUsername("mallardmike")).thenReturn(stored);
+
+        Result<UserWithoutPassword> result = service.login("mallardmike", "wrongpassword");
+
+        assertEquals(ResultType.INVALID, result.getResultType());
+    }
+
+    @Test
+    void loginShouldSucceedWithCorrectPassword() throws DataAccessException {
+        User stored = new User();
+        stored.setId(1);
+        stored.setUsername("mallardmike");
+        stored.setPassword(encoder.encode("correctpassword"));
+        when(repository.findByUsername("mallardmike")).thenReturn(stored);
+
+        Result<UserWithoutPassword> result = service.login("mallardmike", "correctpassword");
+
+        assertTrue(result.isSuccess());
+        assertEquals("mallardmike", result.getpayload().getUsername());
     }
 }
