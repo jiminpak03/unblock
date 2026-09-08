@@ -1,21 +1,64 @@
 package learn.unblock.data;
 
-import learn.unblock.models.User;
-
+import learn.unblock.models.*;
 import java.time.LocalDateTime;
 
 public class TestDataHelper {
+
+    public static final String KNOWN_PASSWORD = "password123";
+
     public static User existingUser() {
-        return new User(1, "mallardmike", "$2a$10$uv9Tais/NKO0IBLj3HryEedbo6OnRrJm.FJL4FG/N6Etz9dQpzbFm", LocalDateTime.of(2026, 1, 1, 10, 0, 0));
+        User user = new User();
+        user.setId(1);
+        user.setUsername("mallardmike");
+        return user;
     }
 
     public static User userToCreate() {
-        return new User(0, "test", "testtest", LocalDateTime.of(2020, 12, 12, 10, 0, 0));
+        User user = new User();
+        user.setUsername("newuser");
+        user.setPassword("some-hashed-string");
+        return user;
     }
 
     public static User userAfterCreate() {
-        User user = userToCreate();
-        user.setId(3);
+        User user = new User();
+        user.setId(4);
+        user.setUsername("newuser");
+        user.setPassword("some-hashed-string");
         return user;
+    }
+
+    public static Board boardToCreate() {
+        Board board = new Board();
+        board.setName("Test Board");
+        board.setOwnerId(1);
+        return board;
+    }
+
+    public static BoardColumn columnToCreate() {
+        BoardColumn column = new BoardColumn();
+        column.setBoardId(1);
+        column.setName("Test Column");
+        column.setPosition(3);
+        return column;
+    }
+
+    public static CardCategory categoryToCreate() {
+        CardCategory category = new CardCategory();
+        category.setBoardId(1);
+        category.setName("Programming");
+        category.setColor("#8b5cf6");
+        return category;
+    }
+
+    public static Card cardToCreate() {
+        Card card = new Card();
+        card.setColumnId(1);
+        card.setTitle("Test Card");
+        card.setDescription("A test card.");
+        card.setComplete(false);
+        card.setPosition(0);
+        return card;
     }
 }

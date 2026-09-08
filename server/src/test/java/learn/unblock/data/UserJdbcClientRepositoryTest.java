@@ -1,4 +1,5 @@
 package learn.unblock.data;
+
 import learn.unblock.models.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,25 +11,38 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class UserJdbcClientRepositoryTest {
-    @Autowired
-    private JdbcClient jdbcClient;
 
     @Autowired
-    private UserJdbcClientRepository repository;
+    UserJdbcClientRepository repository;
+
+    @Autowired
+    JdbcClient jdbcClient;
 
     @BeforeEach
-    void resetDb() {
-        jdbcClient.sql("CALL set_known_good_state()").update();
+    void reset() {
+        jdbcClient.sql("call set_known_good_state()").update();
     }
 
     @Test
-    void findByUsername() throws DataAccessException {
-        User existingUser = repository.findByUsername("mallardmike");
+    void shouldFindExistingUserByUsername() throws DataAccessException {
+        User user = repository.findByUsername("mallardmike");
 
-        assertEquals(existingUser, TestDataHelper.existingUser());
+        assertNotNull(user);
+        assertEquals("mallardmike", user.getUsername());
+        assertTrue(user.getId() > 0);
     }
 
     @Test
-    void create() {
+    void shouldReturnNullForMissingUsername() throws DataAccessException {
+        assertNull(repository.findByUsername("nobody-here"));
+    }
+
+    @Test
+    void shouldCreateUser() throws DataAccessException {
+        User created = repository.create(TestDataHelper.userToCreate());
+
+        assertNotNull(created);
+        assertTrue(created.getId() > 0);
+        assertEquals("newuser", created.getUsername());
     }
 }

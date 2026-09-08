@@ -18,13 +18,19 @@ public class UserService {
     }
 
     public Result<UserWithoutPassword> register(String username, String password) throws DataAccessException {
+        Result<UserWithoutPassword> result = new Result<>();
+
+        if (password == null || password.isBlank()) {
+            result.addErrorMessage("Password cannot be blank", ResultType.INVALID);
+            return result;
+        }
+
         User user = new User();
         user.setUsername(username);
         user.setPassword(passwordEncoder.encode(password));
 
         Result<User> createResult = create(user);
 
-        Result<UserWithoutPassword> result = new Result<>();
         if (!createResult.isSuccess()) {
             for (String message : createResult.getErrorMessages()) {
                 result.addErrorMessage(message, createResult.getResultType());

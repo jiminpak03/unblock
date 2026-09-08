@@ -1,6 +1,7 @@
 package learn.unblock.controllers;
 
 import learn.unblock.data.BoardJdbcClientRepository;
+import learn.unblock.data.BoardRepository;
 import learn.unblock.data.DataAccessException;
 import learn.unblock.domain.BoardService;
 import learn.unblock.domain.Result;
@@ -19,9 +20,9 @@ import java.util.List;
 public class BoardController {
     private final BoardService service;
     private final JwtConverter jwtConverter;
-    private final BoardJdbcClientRepository boardRepository;
+    private final BoardRepository boardRepository;
 
-    public BoardController(BoardService service, JwtConverter jwtConverter, BoardJdbcClientRepository boardRepository) {
+    public BoardController(BoardService service, JwtConverter jwtConverter, BoardRepository boardRepository) {
         this.service = service;
         this.jwtConverter = jwtConverter;
         this.boardRepository = boardRepository;
@@ -44,7 +45,7 @@ public class BoardController {
     }
 
     @GetMapping
-    public ResponseEntity<?> findByUserId(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<?> findByUserId(@RequestHeader("Authorization") String authHeader) throws DataAccessException {
         UserWithoutPassword user = getAuthenticatedUser(authHeader);
 
         if (user == null) {
