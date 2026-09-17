@@ -10,6 +10,7 @@ import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.InviteMemberRequest;
 import learn.unblock.models.dtos.UserWithoutPassword;
 import learn.unblock.security.JwtConverter;
+import learn.unblock.websocket.BoardEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,14 +23,16 @@ public class BoardMemberController {
     private final JwtConverter jwtConverter;
     private final BoardMemberRepository memberRepository;
     private final BoardAccessService accessService;
+    private final BoardEventPublisher eventPublisher;
 
     public BoardMemberController(BoardMemberService service, BoardMemberRepository repository, JwtConverter jwtConverter,
-                                  BoardMemberRepository memberRepository, BoardAccessService accessService) {
+                                  BoardMemberRepository memberRepository, BoardAccessService accessService, BoardEventPublisher eventPublisher) {
         this.service = service;
         this.repository = repository;
         this.jwtConverter = jwtConverter;
         this.memberRepository = memberRepository;
         this.accessService = accessService;
+        this.eventPublisher = eventPublisher;
     }
 
     @PostMapping("/{id}/member")
@@ -49,6 +52,7 @@ public class BoardMemberController {
         if (!result.isSuccess()) {
             return new ResponseEntity<>(result.getErrorMessages(), HttpStatus.BAD_REQUEST);
         }
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(result.getpayload(), HttpStatus.CREATED);
     }
 
@@ -73,6 +77,7 @@ public class BoardMemberController {
         }
 
         memberRepository.delete(boardId, userId);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
@@ -88,6 +93,7 @@ public class BoardMemberController {
         }
 
         memberRepository.updateRole(boardId, userId, request.getRole());
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

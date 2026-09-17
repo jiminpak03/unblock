@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { useNavigate, useParams } from "react-router-dom";
 import type { UserWithoutPassword } from "../types/User";
 import type { Board, Column, Card, Category, Member } from "../types/board";
@@ -7,8 +8,11 @@ import BoardColumnCard from "./BoardColumnCard";
 import BoardMembers from "./BoardMembers";
 import BoardCategories from "./BoardCategories";
 import CardDetailModal from "./CardDetailModal";
+import useBoardSocket from "../hooks/useBoardSocket";
 
-const POLL_INTERVAL_MS = 4000;
+// Fallback poll in case the websocket connection drops; live updates normally
+// arrive via useBoardSocket well before this fires.
+const POLL_INTERVAL_MS = 25000;
 
 interface BoardViewProps {
   token: string;
@@ -42,11 +46,10 @@ function BoardView({ token, user }: BoardViewProps) {
     (c) => unblockedIds.includes(c.id) && !c.isComplete,
   );
 
-  useEffect(() => {
+  const loadBoardData = useCallback(() => {
     if (!boardId) return;
 
-    function loadBoardData() {
-      const boardPromise = fetch(`http://localhost:8080/api/board/${boardId}`, {
+    const boardPromise = fetch(`http://localhost:8080/api/board/${boardId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
@@ -114,12 +117,20 @@ function BoardView({ token, user }: BoardViewProps) {
         membersPromise,
         unblockedPromise,
       ]).then(() => setIsLoading(false));
-    }
+  }, [boardId, token]);
 
+  useEffect(() => {
     loadBoardData();
     const intervalId = setInterval(loadBoardData, POLL_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, [boardId, token]);
+  }, [loadBoardData]);
+
+  const handleBoardChanged = useCallback(() => {
+    loadBoardData();
+    setGraphVersion((v) => v + 1);
+  }, [loadBoardData]);
+
+  useBoardSocket(token, boardId, handleBoardChanged);
 
   function refreshUnblocked() {
     fetch(`http://localhost:8080/api/board/${boardId}/unblocked`, {
@@ -134,7 +145,7 @@ function BoardView({ token, user }: BoardViewProps) {
     setGraphVersion((v) => v + 1);
   }
 
-  async function handleAddColumn(event: React.FormEvent<HTMLFormElement>) {
+  async function handleAddColumn(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!newColumnName || !boardId) return;
 
@@ -243,26 +254,27 @@ function BoardView({ token, user }: BoardViewProps) {
     }
   }
 
-  async function handleAddCard(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (targetColumnId === null) return;
+  async function handleAddCard(event: React.SubmitEvent<HTMLFormElement>) {
+  event.preventDefault();
+  if (targetColumnId === null) return;
 
-    const response = await fetch("http://localhost:8080/api/card", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ columnId: targetColumnId, title: newCardTitle }),
-    });
+  const response = await fetch("http://localhost:8080/api/card", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ columnId: targetColumnId, title: newCardTitle }),
+  });
 
-    if (response.ok) {
-      const created: Card = await response.json();
-      setCards([...cards, created]);
-      setNewCardTitle("");
-      setGraphVersion((v) => v + 1);
-    }
+  if (response.ok) {
+    const created: Card = await response.json();
+    setCards([...cards, created]);
+    setNewCardTitle("");
+    refreshUnblocked();
+    setGraphVersion((v) => v + 1);
   }
+}
 
   async function handleAddDependency(
     cardId: number,
@@ -327,6 +339,17 @@ function BoardView({ token, user }: BoardViewProps) {
       setCards(cards.map((c) => (c.id === card.id ? updated : c)));
       notifyChanged();
     }
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const card = cards.find((c) => c.id === Number(active.id));
+    const newColumnId = Number(over.id);
+    if (!card || card.columnId === newColumnId) return;
+
+    handleMoveCard(card, newColumnId);
   }
 
   async function handleDeleteCard(id: number) {
@@ -575,7 +598,9 @@ function BoardView({ token, user }: BoardViewProps) {
                 boardId={boardId}
                 refreshKey={graphVersion}
                 unblockedIds={unblockedIds}
+                canEdit={canEdit}
                 onNodeClick={(cardId) => setSelectedCardId(cardId)}
+                onAddDependency={handleAddDependency}
               />
             )
           ) : (
@@ -647,26 +672,28 @@ function BoardView({ token, user }: BoardViewProps) {
                 </form>
               )}
 
-              <div className="flex gap-4 overflow-x-auto">
-                {columns.map((col) => (
-                  <BoardColumnCard
-                    key={col.id}
-                    column={col}
-                    columns={columns}
-                    cards={cards}
-                    categories={categories}
-                    unblockedIds={unblockedIds}
-                    canEdit={canEdit}
-                    onRenameColumn={handleRenameColumn}
-                    onDeleteColumn={handleDeleteColumn}
-                    onToggleComplete={toggleComplete}
-                    onSelectCard={(cardId) => setSelectedCardId(cardId)}
-                    onDeleteCard={handleDeleteCard}
-                    onAddDependency={handleAddDependency}
-                    onMoveCard={handleMoveCard}
-                  />
-                ))}
-              </div>
+              <DndContext onDragEnd={handleDragEnd}>
+                <div className="flex gap-4 overflow-x-auto">
+                  {columns.map((col) => (
+                    <BoardColumnCard
+                      key={col.id}
+                      column={col}
+                      columns={columns}
+                      cards={cards}
+                      categories={categories}
+                      unblockedIds={unblockedIds}
+                      canEdit={canEdit}
+                      onRenameColumn={handleRenameColumn}
+                      onDeleteColumn={handleDeleteColumn}
+                      onToggleComplete={toggleComplete}
+                      onSelectCard={(cardId) => setSelectedCardId(cardId)}
+                      onDeleteCard={handleDeleteCard}
+                      onAddDependency={handleAddDependency}
+                      onMoveCard={handleMoveCard}
+                    />
+                  ))}
+                </div>
+              </DndContext>
             </>
           )}
         </>

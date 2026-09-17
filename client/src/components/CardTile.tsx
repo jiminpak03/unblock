@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDraggable } from "@dnd-kit/core";
 import type { Card, Category, Column } from "../types/board";
 
 interface CardTileProps {
@@ -37,6 +38,16 @@ function CardTile({
   const isBlocked = !unblockedIds.includes(card.id) && !card.isComplete;
   const category = categories.find((cat) => cat.id === card.categoryId);
 
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({ id: card.id, disabled: !canEdit });
+
+  const dragStyle = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        zIndex: 10,
+      }
+    : undefined;
+
   async function handleAddDependency() {
     const dependsOnCardId = Number(dependencyTarget);
     if (!dependsOnCardId) return;
@@ -50,12 +61,25 @@ function CardTile({
   return (
     <div
       id={`card-${card.id}`}
+      ref={setNodeRef}
+      style={dragStyle}
       className={`bg-white border rounded-lg p-3 space-y-2 ${
         isBlocked ? "border-rose-300 bg-rose-50/60" : ""
-      }`}
+      } ${isDragging ? "opacity-50" : ""}`}
     >
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm flex-1">
+          {canEdit && (
+            <span
+              {...attributes}
+              {...listeners}
+              className="cursor-grab text-gray-300 hover:text-gray-500 select-none px-1 -mx-1 text-base leading-none"
+              style={{ touchAction: "none" }}
+              title="Drag to move"
+            >
+              ⠿
+            </span>
+          )}
           <input
             type="checkbox"
             checked={card.isComplete}
@@ -99,7 +123,7 @@ function CardTile({
           <select
             value={dependencyTarget}
             onChange={(e) => setDependencyTarget(e.target.value)}
-            className="text-xs border rounded flex-1"
+            className="text-xs border rounded flex-1 min-w-0"
           >
             <option value="">Depends on...</option>
             {cards

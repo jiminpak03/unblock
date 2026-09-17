@@ -9,6 +9,7 @@ import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.CreateCardRequest;
 import learn.unblock.models.dtos.UserWithoutPassword;
 import learn.unblock.security.JwtConverter;
+import learn.unblock.websocket.BoardEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,12 +21,14 @@ public class CardController {
     private final JwtConverter jwtConverter;
     private final CardRepository repository;
     private final BoardAccessService accessService;
+    private final BoardEventPublisher eventPublisher;
 
-    public CardController(CardService service, JwtConverter jwtConverter, CardRepository repository, BoardAccessService accessService) {
+    public CardController(CardService service, JwtConverter jwtConverter, CardRepository repository, BoardAccessService accessService, BoardEventPublisher eventPublisher) {
         this.service = service;
         this.jwtConverter = jwtConverter;
         this.repository = repository;
         this.accessService = accessService;
+        this.eventPublisher = eventPublisher;
     }
 
     @GetMapping("/column/{columnId}")
@@ -46,6 +49,7 @@ public class CardController {
 
         Result<Card> result = service.create(request.getColumnId(), request.getCategoryId(), request.getTitle(), request.getDescription());
         if (!result.isSuccess()) return new ResponseEntity<>(result.getErrorMessages(), HttpStatus.BAD_REQUEST);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(result.getpayload(), HttpStatus.CREATED);
     }
 
@@ -63,6 +67,7 @@ public class CardController {
         card.setId(id);
         Result<Card> result = service.update(card);
         if (!result.isSuccess()) return new ResponseEntity<>(result.getErrorMessages(), HttpStatus.BAD_REQUEST);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(result.getpayload(), HttpStatus.OK);
     }
 
@@ -79,6 +84,7 @@ public class CardController {
 
         boolean deleted = repository.delete(id);
         if (!deleted) return new ResponseEntity<>("Card not found.", HttpStatus.NOT_FOUND);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

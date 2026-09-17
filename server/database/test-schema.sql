@@ -65,6 +65,11 @@ create table card_dependency (
     constraint fk_dep_depends_on foreign key (depends_on_card_id) references card(id) on delete cascade
 );
 
+alter table card drop foreign key fk_card_category;
+alter table card add constraint fk_card_category
+    foreign key (category_id) references card_category(id)
+    on delete cascade;
+
 delimiter //
 create procedure set_known_good_state()
 begin

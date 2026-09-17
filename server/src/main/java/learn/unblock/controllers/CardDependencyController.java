@@ -8,6 +8,7 @@ import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.AddDependencyRequest;
 import learn.unblock.models.dtos.UserWithoutPassword;
 import learn.unblock.security.JwtConverter;
+import learn.unblock.websocket.BoardEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,13 +20,15 @@ public class CardDependencyController {
     private final CardDependencyRepository repository;
     private final JwtConverter jwtConverter;
     private final BoardAccessService accessService;
+    private final BoardEventPublisher eventPublisher;
 
     public CardDependencyController(CardDependencyService service, CardDependencyRepository repository,
-                                     JwtConverter jwtConverter, BoardAccessService accessService) {
+                                     JwtConverter jwtConverter, BoardAccessService accessService, BoardEventPublisher eventPublisher) {
         this.service = service;
         this.repository = repository;
         this.jwtConverter = jwtConverter;
         this.accessService = accessService;
+        this.eventPublisher = eventPublisher;
     }
 
     @PostMapping("/{cardId}/dependency")
@@ -42,6 +45,7 @@ public class CardDependencyController {
 
         Result<Void> result = service.addDependency(cardId, request.getDependsOnCardId());
         if (!result.isSuccess()) return new ResponseEntity<>(result.getErrorMessages(), HttpStatus.BAD_REQUEST);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.CREATED);
     }
 
@@ -63,6 +67,7 @@ public class CardDependencyController {
         }
 
         repository.delete(cardId, dependsOnCardId);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

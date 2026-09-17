@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import type { Card, Category, Column } from "../types/board";
 import CardTile from "./CardTile";
 
@@ -38,6 +39,7 @@ function BoardColumnCard({
 }: BoardColumnCardProps) {
   const [name, setName] = useState(column.name);
   const columnCards = cards.filter((c) => c.columnId === column.id);
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
   function handleBlur() {
     if (name && name !== column.name) {
@@ -56,7 +58,12 @@ function BoardColumnCard({
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg p-3 w-64 shrink-0">
+    <div
+      ref={setNodeRef}
+      className={`bg-gray-50 rounded-lg p-3 w-64 shrink-0 ${
+        isOver ? "ring-2 ring-indigo-400" : ""
+      }`}
+    >
       <div className="flex items-center justify-between mb-2">
         <input
           value={name}

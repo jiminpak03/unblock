@@ -6,6 +6,7 @@ import learn.unblock.models.BoardColumn;
 import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.UserWithoutPassword;
 import learn.unblock.security.JwtConverter;
+import learn.unblock.websocket.BoardEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,11 +20,13 @@ public class BoardColumnController {
     private final BoardColumnRepository repository;
     private final JwtConverter jwtConverter;
     private final BoardAccessService accessService;
+    private final BoardEventPublisher eventPublisher;
 
-    public BoardColumnController(BoardColumnRepository repository, JwtConverter jwtConverter, BoardAccessService accessService) {
+    public BoardColumnController(BoardColumnRepository repository, JwtConverter jwtConverter, BoardAccessService accessService, BoardEventPublisher eventPublisher) {
         this.repository = repository;
         this.jwtConverter = jwtConverter;
         this.accessService = accessService;
+        this.eventPublisher = eventPublisher;
     }
 
     @GetMapping("/{boardId}/column")
@@ -46,6 +49,7 @@ public class BoardColumnController {
 
         column.setId(id);
         repository.update(column);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
@@ -61,6 +65,7 @@ public class BoardColumnController {
         }
 
         repository.delete(id);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
@@ -76,6 +81,7 @@ public class BoardColumnController {
 
         column.setBoardId(boardId);
         BoardColumn created = repository.create(column);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 }

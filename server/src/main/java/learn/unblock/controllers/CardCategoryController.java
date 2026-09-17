@@ -7,6 +7,7 @@ import learn.unblock.models.MemberRole;
 import learn.unblock.models.dtos.CreateCategoryRequest;
 import learn.unblock.security.JwtConverter;
 import learn.unblock.models.dtos.UserWithoutPassword;
+import learn.unblock.websocket.BoardEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,11 +21,13 @@ public class CardCategoryController {
     private final CardCategoryRepository repository;
     private final JwtConverter jwtConverter;
     private final BoardAccessService accessService;
+    private final BoardEventPublisher eventPublisher;
 
-    public CardCategoryController(CardCategoryRepository repository, JwtConverter jwtConverter, BoardAccessService accessService) {
+    public CardCategoryController(CardCategoryRepository repository, JwtConverter jwtConverter, BoardAccessService accessService, BoardEventPublisher eventPublisher) {
         this.repository = repository;
         this.jwtConverter = jwtConverter;
         this.accessService = accessService;
+        this.eventPublisher = eventPublisher;
     }
 
     @GetMapping("/{boardId}/category")
@@ -52,6 +55,7 @@ public class CardCategoryController {
         category.setColor(request.getColor());
 
         CardCategory created = repository.create(category);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(created, HttpStatus.CREATED);
     }
 
@@ -69,6 +73,7 @@ public class CardCategoryController {
 
         category.setId(id);
         repository.update(category);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
@@ -84,6 +89,7 @@ public class CardCategoryController {
         }
 
         repository.delete(id);
+        eventPublisher.notifyBoardChanged(boardId);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }

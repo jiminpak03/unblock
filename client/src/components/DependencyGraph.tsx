@@ -1,12 +1,15 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node,
   type Edge,
+  type Connection,
 } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
 
@@ -26,7 +29,12 @@ interface DependencyGraphProps {
   boardId: string;
   refreshKey: number;
   unblockedIds: number[];
+  canEdit: boolean;
   onNodeClick: (cardId: number) => void;
+  onAddDependency: (
+    cardId: number,
+    dependsOnCardId: number,
+  ) => Promise<boolean>;
 }
 
 function getLayoutedElements(nodes: Node[], edges: Edge[]) {
@@ -75,7 +83,7 @@ function nodeLabel(card: GraphCard) {
   );
 }
 
-function nodeStyle(isComplete: boolean, isBlocked: boolean) {
+function nodeStyle(isComplete: boolean, isBlocked: boolean, isHighlighted: boolean) {
   return {
     border: isComplete
       ? "2px solid #22C55E"
@@ -87,22 +95,29 @@ function nodeStyle(isComplete: boolean, isBlocked: boolean) {
     padding: "10px 14px",
     fontSize: 12,
     background: "white",
-    boxShadow:
-      "0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 8px rgba(15, 23, 42, 0.08)",
+    boxShadow: isHighlighted
+      ? "0 0 0 3px rgba(99, 102, 241, 0.5), 0 4px 8px rgba(15, 23, 42, 0.15)"
+      : "0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 8px rgba(15, 23, 42, 0.08)",
   };
 }
 
-function DependencyGraph({
+function DependencyGraphInner({
   token,
   boardId,
   refreshKey,
   unblockedIds,
+  canEdit,
   onNodeClick,
+  onAddDependency,
 }: DependencyGraphProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [graphCards, setGraphCards] = useState<GraphCard[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const highlightTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { fitView } = useReactFlow();
 
   useEffect(() => {
     fetch(`http://localhost:8080/api/board/${boardId}/graph`, {
@@ -123,7 +138,7 @@ function DependencyGraph({
           id: String(c.id),
           position: { x: 0, y: 0 },
           data: { label: nodeLabel(c) },
-          style: nodeStyle(c.isComplete, false),
+          style: nodeStyle(c.isComplete, false, false),
         }));
 
         setNodes(getLayoutedElements(rawNodes, rawEdges));
@@ -133,9 +148,6 @@ function DependencyGraph({
       .catch(console.error);
   }, [boardId, token, refreshKey, setNodes, setEdges]);
 
-  // Re-style nodes (blocked / complete) when the unblocked set changes,
-  // without disturbing their positions. Keyed on a stable string so the
-  // board's 4s polling (new array, same contents) doesn't churn the graph.
   const unblockedKey = [...unblockedIds].sort((a, b) => a - b).join(",");
   useEffect(() => {
     setNodes((current) =>
@@ -147,17 +159,46 @@ function DependencyGraph({
         return {
           ...n,
           data: { label: nodeLabel(card) },
-          style: nodeStyle(card.isComplete, isBlocked),
+          style: nodeStyle(card.isComplete, isBlocked, n.id === String(highlightedId)),
         };
       }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unblockedKey, graphCards, setNodes]);
+  }, [unblockedKey, graphCards, highlightedId, setNodes]);
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => onNodeClick(Number(node.id)),
     [onNodeClick],
   );
+
+  const handleConnect = useCallback(
+    (connection: Connection) => {
+      const { source, target } = connection;
+      if (!source || !target || source === target) return;
+      onAddDependency(Number(target), Number(source));
+    },
+    [onAddDependency],
+  );
+
+  const matches = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return [];
+    return graphCards.filter((c) => c.title.toLowerCase().includes(term));
+  }, [searchTerm, graphCards]);
+
+  function focusOnCard(cardId: number) {
+    fitView({ nodes: [{ id: String(cardId) }], duration: 400, maxZoom: 1.5 });
+    setHighlightedId(cardId);
+    if (highlightTimeout.current) clearTimeout(highlightTimeout.current);
+    highlightTimeout.current = setTimeout(() => setHighlightedId(null), 2000);
+    setSearchTerm("");
+  }
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" && matches.length > 0) {
+      focusOnCard(matches[0].id);
+    }
+  }
 
   if (hasLoaded && nodes.length === 0) {
     return (
@@ -174,19 +215,56 @@ function DependencyGraph({
   }
 
   return (
-    <div style={{ height: 500 }} className="border rounded-lg bg-gray-50">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={handleNodeClick}
-        fitView
-      >
-        <Background />
-        <Controls />
-      </ReactFlow>
+    <div>
+      <div className="relative mb-2 w-64">
+        <input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          placeholder="Search cards…"
+          className="border rounded-lg px-3 py-1.5 text-sm w-full"
+        />
+        {matches.length > 0 && (
+          <ul className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-52 overflow-y-auto">
+            {matches.map((c) => (
+              <li key={c.id}>
+                <button
+                  type="button"
+                  onClick={() => focusOnCard(c.id)}
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-indigo-50"
+                >
+                  {c.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div style={{ height: 500 }} className="border rounded-lg bg-gray-50">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={handleNodeClick}
+          onConnect={handleConnect}
+          nodesConnectable={canEdit}
+          fitView
+        >
+          <Background />
+          <Controls />
+        </ReactFlow>
+      </div>
     </div>
+  );
+}
+
+function DependencyGraph(props: DependencyGraphProps) {
+  return (
+    <ReactFlowProvider>
+      <DependencyGraphInner {...props} />
+    </ReactFlowProvider>
   );
 }
 
