@@ -10,8 +10,6 @@ import BoardCategories from "./BoardCategories";
 import CardDetailModal from "./CardDetailModal";
 import useBoardSocket from "../hooks/useBoardSocket";
 
-// Fallback poll in case the websocket connection drops; live updates normally
-// arrive via useBoardSocket well before this fires.
 const POLL_INTERVAL_MS = 25000;
 
 interface BoardViewProps {

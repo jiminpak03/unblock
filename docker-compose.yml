@@ -1,0 +1,54 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: unblock
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./server/database/prod-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./server/database/seed-data.sql:/docker-entrypoint-initdb.d/02-seed-data.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/unblock?useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount the (gitignored) pre-generated help index if you have one on
+      # the host, so the /api/help/ask feature works without rebuilding.
+      - ./server/help-data:/app/help-data:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  client:
+    build: ./client
+    restart: unless-stopped
+    depends_on:
+      - server
+    # Published on 5173 so it matches the server's hardcoded CORS/WebSocket
+    # allowed origin (http://localhost:5173).
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql-data:

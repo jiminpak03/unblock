@@ -37,7 +37,7 @@ function AppRouter() {
   const router = createBrowserRouter([
     {
       path: "/",
-      element: <Layout user={user} onLogout={handleLogout} />,
+      element: <Layout user={user} token={token} onLogout={handleLogout} />,
       children: [
         { path: "/login", element: <Login onLogin={handleLogin} /> },
         { path: "/register", element: <Register /> },

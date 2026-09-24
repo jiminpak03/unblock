@@ -1,6 +1,17 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { Card, Category, Column } from "../types/board";
+
+const PARTICLE_ANGLES_DEG = [0, 60, 120, 180, 240, 300];
+const PARTICLE_DISTANCE_PX = 20;
+
+function particleOffset(angleDeg: number): React.CSSProperties {
+  const rad = (angleDeg * Math.PI) / 180;
+  return {
+    "--dx": `${Math.cos(rad) * PARTICLE_DISTANCE_PX}px`,
+    "--dy": `${Math.sin(rad) * PARTICLE_DISTANCE_PX}px`,
+  } as React.CSSProperties;
+}
 
 interface CardTileProps {
   card: Card;
@@ -38,6 +49,16 @@ function CardTile({
   const isBlocked = !unblockedIds.includes(card.id) && !card.isComplete;
   const category = categories.find((cat) => cat.id === card.categoryId);
 
+  const wasBlockedRef = useRef(isBlocked);
+  const [isCelebrating, setIsCelebrating] = useState(false);
+
+  useEffect(() => {
+    if (wasBlockedRef.current && !isBlocked && !card.isComplete) {
+      setIsCelebrating(true);
+    }
+    wasBlockedRef.current = isBlocked;
+  }, [isBlocked, card.isComplete]);
+
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({ id: card.id, disabled: !canEdit });
 
@@ -63,10 +84,23 @@ function CardTile({
       id={`card-${card.id}`}
       ref={setNodeRef}
       style={dragStyle}
-      className={`bg-white border rounded-lg p-3 space-y-2 ${
+      className={`relative bg-white border rounded-lg p-3 space-y-2 ${
         isBlocked ? "border-rose-300 bg-rose-50/60" : ""
-      } ${isDragging ? "opacity-50" : ""}`}
+      } ${isDragging ? "opacity-50" : ""} ${
+        isCelebrating ? "unblock-celebrate" : ""
+      }`}
+      onAnimationEnd={(e) => {
+        if (e.currentTarget === e.target) setIsCelebrating(false);
+      }}
     >
+      {isCelebrating &&
+        PARTICLE_ANGLES_DEG.map((angle) => (
+          <span
+            key={angle}
+            className="unblock-particle"
+            style={particleOffset(angle)}
+          />
+        ))}
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-sm flex-1">
           {canEdit && (

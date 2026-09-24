@@ -1,12 +1,14 @@
 import { Outlet, Link, useNavigate } from "react-router-dom";
 import type { UserWithoutPassword } from "../types/User";
+import HelpWidget from "./HelpWidget";
 
 interface LayoutProps {
   user: UserWithoutPassword | null;
+  token: string | null;
   onLogout: () => void;
 }
 
-function Layout({ user, onLogout }: LayoutProps) {
+function Layout({ user, token, onLogout }: LayoutProps) {
   const navigate = useNavigate();
 
   function handleLogoutClick() {
@@ -46,6 +48,8 @@ function Layout({ user, onLogout }: LayoutProps) {
       <main className="p-6">
         <Outlet />
       </main>
+
+      {user && token && <HelpWidget token={token} />}
     </div>
   );
 }

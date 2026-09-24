@@ -4,11 +4,15 @@ import {
   ReactFlowProvider,
   Background,
   Controls,
+  BaseEdge,
+  getBezierPath,
+  ConnectionLineType,
   useNodesState,
   useEdgesState,
   useReactFlow,
   type Node,
   type Edge,
+  type EdgeProps,
   type Connection,
 } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
@@ -101,6 +105,66 @@ function nodeStyle(isComplete: boolean, isBlocked: boolean, isHighlighted: boole
   };
 }
 
+function FlowEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style,
+  data,
+}: EdgeProps) {
+  const [edgePath] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  const edgeData = data as { flowing?: boolean; justConnected?: boolean } | undefined;
+  const isFlowing = Boolean(edgeData?.flowing);
+  const isJustConnected = Boolean(edgeData?.justConnected);
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} />
+      {isFlowing && (
+        <path d={edgePath} fill="none" className="unblock-edge-flow" />
+      )}
+      {isJustConnected && (
+        <path d={edgePath} fill="none" className="unblock-edge-snap" />
+      )}
+    </>
+  );
+}
+
+const edgeTypes = { flow: FlowEdge };
+
+function wouldCreateCycle(
+  edges: Edge[],
+  cardId: number,
+  dependsOnCardId: number,
+): boolean {
+  const toCheck = [dependsOnCardId];
+  const seen = new Set<number>();
+
+  while (toCheck.length > 0) {
+    const current = toCheck.shift()!;
+    if (current === cardId) return true;
+    if (seen.has(current)) continue;
+    seen.add(current);
+
+    edges
+      .filter((e) => Number(e.target) === current)
+      .forEach((e) => toCheck.push(Number(e.source)));
+  }
+
+  return false;
+}
+
 function DependencyGraphInner({
   token,
   boardId,
@@ -117,6 +181,9 @@ function DependencyGraphInner({
   const [searchTerm, setSearchTerm] = useState("");
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
   const highlightTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rejectShakeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const snapTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousEdgeIds = useRef<Set<string> | null>(null);
   const { fitView } = useReactFlow();
 
   useEffect(() => {
@@ -132,7 +199,34 @@ function DependencyGraphInner({
           id: `${e.dependsOnCardId}-${e.cardId}`,
           source: String(e.dependsOnCardId),
           target: String(e.cardId),
+          type: "flow",
+          data: { flowing: false, justConnected: false },
         }));
+
+        const newEdgeIds = previousEdgeIds.current
+          ? rawEdges
+              .map((e) => e.id)
+              .filter((id) => !previousEdgeIds.current!.has(id))
+          : [];
+        previousEdgeIds.current = new Set(rawEdges.map((e) => e.id));
+
+        if (newEdgeIds.length > 0) {
+          rawEdges.forEach((e) => {
+            if (newEdgeIds.includes(e.id)) {
+              e.data = { ...e.data, justConnected: true };
+            }
+          });
+          if (snapTimeout.current) clearTimeout(snapTimeout.current);
+          snapTimeout.current = setTimeout(() => {
+            setEdges((current) =>
+              current.map((e) =>
+                newEdgeIds.includes(e.id)
+                  ? { ...e, data: { ...e.data, justConnected: false } }
+                  : e,
+              ),
+            );
+          }, 450);
+        }
 
         const rawNodes: Node[] = cards.map((c) => ({
           id: String(c.id),
@@ -166,18 +260,63 @@ function DependencyGraphInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unblockedKey, graphCards, highlightedId, setNodes]);
 
+  useEffect(() => {
+    setEdges((current) =>
+      current.map((e) => {
+        const sourceCard = graphCards.find((c) => String(c.id) === e.source);
+        const targetCard = graphCards.find((c) => String(c.id) === e.target);
+        const targetBlocked =
+          !!targetCard &&
+          !targetCard.isComplete &&
+          !unblockedIds.includes(targetCard.id);
+        const flowing = !!sourceCard?.isComplete && targetBlocked;
+        return { ...e, data: { ...e.data, flowing } };
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unblockedKey, graphCards, setEdges]);
+
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => onNodeClick(Number(node.id)),
     [onNodeClick],
   );
 
+  const flashRejected = useCallback(
+    (nodeIds: string[]) => {
+      setNodes((current) =>
+        current.map((n) =>
+          nodeIds.includes(n.id) ? { ...n, className: "unblock-reject-shake" } : n,
+        ),
+      );
+      if (rejectShakeTimeout.current) clearTimeout(rejectShakeTimeout.current);
+      rejectShakeTimeout.current = setTimeout(() => {
+        setNodes((current) =>
+          current.map((n) =>
+            nodeIds.includes(n.id) ? { ...n, className: undefined } : n,
+          ),
+        );
+      }, 450);
+    },
+    [setNodes],
+  );
+
   const handleConnect = useCallback(
     (connection: Connection) => {
       const { source, target } = connection;
-      if (!source || !target || source === target) return;
+      if (!source || !target) return;
+
+      const isInvalid =
+        source === target ||
+        wouldCreateCycle(edges, Number(target), Number(source));
+
+      if (isInvalid) {
+        flashRejected([source, target]);
+        return;
+      }
+
       onAddDependency(Number(target), Number(source));
     },
-    [onAddDependency],
+    [edges, onAddDependency, flashRejected],
   );
 
   const matches = useMemo(() => {
@@ -245,11 +384,18 @@ function DependencyGraphInner({
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={handleNodeClick}
           onConnect={handleConnect}
           nodesConnectable={canEdit}
+          connectionLineType={ConnectionLineType.Bezier}
+          connectionLineStyle={{
+            stroke: "#6366f1",
+            strokeWidth: 2.5,
+            strokeDasharray: "6 6",
+          }}
           fitView
         >
           <Background />
