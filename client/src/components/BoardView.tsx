@@ -8,6 +8,7 @@ import BoardColumnCard from "./BoardColumnCard";
 import BoardMembers from "./BoardMembers";
 import BoardCategories from "./BoardCategories";
 import CardDetailModal from "./CardDetailModal";
+import BoardAskWidget from "./BoardAskWidget";
 import useBoardSocket from "../hooks/useBoardSocket";
 
 const POLL_INTERVAL_MS = 25000;
@@ -714,6 +715,8 @@ function BoardView({ token, user }: BoardViewProps) {
           onRemoveDependency={handleRemoveDependency}
         />
       )}
+
+      {boardId && <BoardAskWidget token={token} boardId={boardId} />}
     </div>
   );
 }

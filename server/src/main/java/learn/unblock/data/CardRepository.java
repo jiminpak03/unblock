@@ -8,6 +8,7 @@ public interface CardRepository {
     Card create(Card card);
     Card findById(int id);
     List<Card> findByColumnId(int columnId);
+    List<Card> findByBoardId(int boardId);
     boolean update(Card card);
     boolean delete(int id);
 }

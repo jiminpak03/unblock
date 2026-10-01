@@ -1,9 +1,5 @@
 package learn.unblock.help;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,11 +7,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-/**
- * Thin client for a locally-running Ollama server (https://ollama.com).
- * No Spring dependency, so it can be used both as a bean in the app and
- * standalone from {@link HelpDocIndexer}'s main method.
- */
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 public class OllamaClient {
 
     private final String baseUrl;

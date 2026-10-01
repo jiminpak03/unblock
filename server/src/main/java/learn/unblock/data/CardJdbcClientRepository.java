@@ -54,6 +54,18 @@ public class CardJdbcClientRepository implements CardRepository {
     }
 
     @Override
+    public List<Card> findByBoardId(int boardId) {
+        final String sql = """
+                select c.*
+                from card c
+                join board_column bc on c.column_id = bc.id
+                where bc.board_id = ?
+                order by bc.position, c.position
+                """;
+        return jdbcClient.sql(sql).param(boardId).query(new CardMapper()).list();
+    }
+
+    @Override
     public boolean update(Card card) {
         final String sql = """
                 update card set column_id = :column_id, category_id = :category_id, title = :title,

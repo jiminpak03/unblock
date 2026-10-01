@@ -1,5 +1,6 @@
 package learn.unblock.data;
 
+import learn.unblock.models.dtos.GraphEdge;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -62,6 +63,23 @@ public class CardDependencyJdbcClientRepository implements CardDependencyReposit
         return jdbcClient.sql(sql)
                 .param("board_id", boardId)
                 .query(Integer.class)
+                .list();
+    }
+
+    @Override
+    public List<GraphEdge> findByBoardId(int boardId) {
+        final String sql = """
+                select cd.card_id, cd.depends_on_card_id
+                from card_dependency cd
+                join card c on cd.card_id = c.id
+                join board_column bc on c.column_id = bc.id
+                where bc.board_id = :board_id
+                """;
+        return jdbcClient.sql(sql)
+                .param("board_id", boardId)
+                .query((rs, rowNum) -> new GraphEdge(
+                        rs.getInt("card_id"),
+                        rs.getInt("depends_on_card_id")))
                 .list();
     }
 

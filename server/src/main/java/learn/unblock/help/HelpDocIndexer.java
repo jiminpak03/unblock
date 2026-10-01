@@ -1,21 +1,13 @@
 package learn.unblock.help;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-/**
- * Standalone script: chunks the help docs, embeds each chunk via a local
- * Ollama server, and writes the result to a JSON index file that
- * {@link HelpVectorStore} loads at app startup.
- *
- * Run with: mvn compile exec:java@index-help-docs
- * Optional args: [docsDir] [outputPath] [ollamaBaseUrl] [embeddingModel]
- */
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
 public class HelpDocIndexer {
 
     public static void main(String[] args) throws IOException, InterruptedException {
